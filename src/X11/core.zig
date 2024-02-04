@@ -17,9 +17,9 @@ const X11 = struct {
     options: X11Options = .{},
     allocator: std.mem.Allocator,
 
-    connection: ?std.net.Stream=null,
-    xdata: ?xsetup.Setup=null,
-    id_gen: ?id_generator.IDGenerator=null,
+    connection: ?std.net.Stream = null,
+    xdata: ?xsetup.Setup = null,
+    id_gen: ?id_generator.IDGenerator = null,
 
     pub fn init(allocator: std.mem.Allocator, options: X11Options) @This() {
         return .{
@@ -29,17 +29,17 @@ const X11 = struct {
     }
 
     pub fn deinit(self: *@This()) void {
-        if(self.connection) |conn| {
+        if (self.connection) |conn| {
             conn.close();
         }
     }
 
     pub fn connect(self: *@This()) !void {
-       self.connection = try xconnection.connect();
+        self.connection = try xconnection.connect();
     }
- 
+
     pub fn setup(self: *@This()) !void {
-        if(self.connection) |conn| {
+        if (self.connection) |conn| {
             self.xdata = try xsetup.setup(self.allocator, conn);
             self.id_gen = id_generator.IDGenerator.init(self.xdata.?.resource_id_base, self.xdata.?.resource_id_mask);
         } else {
@@ -71,9 +71,11 @@ const X11 = struct {
         try xwindow.unmapWindowRequest(self.connection.?, window_id);
     }
 
-    pub fn receive(self: *@This()) !void{
-        if(self.connection) |conn| {
-            try readMessage(self.allocator, conn.reader());
+    pub fn receive(self: *@This()) !?Message {
+        if (self.connection) |conn| {
+            return readMessage(self.allocator, conn);
+        } else {
+            return error.NotConnected;
         }
     }
 };
@@ -91,46 +93,46 @@ fn withDefaultWindowOptions(screen: xsetup.Screen, _: xwindow.WindowOptions) xwi
     return options;
 }
 
-fn readMessage(_: std.mem.Allocator, reader: anytype) !void {
+fn readMessage(_: std.mem.Allocator, reader: anytype) !?Message {
     std.debug.print("Reading message...\n", .{});
+    var message: [32]u8 = undefined;
+    const read = reader.read(&message) catch |err| {
+        switch (err) {
+            error.WouldBlock => return null,
+            else => return err,
+        }
+    };
+    std.debug.print("Bytes read: {d}\n", .{read});
 
-    const message_type: u8 = try reader.readByte();
+    const message_type = message[0];
     std.debug.print("Message type: {d}\n", .{message_type});
 
     switch (message_type) {
         0 => {
-            // error
-            const code = try reader.readByte();
-            const seq = try reader.readInt(u16, endian); // sequence number
-            const info = try reader.readInt(u32, endian); // depend on type of error
-            const minor = try reader.readInt(u16, endian); // minor opcode
-            const major = try reader.readInt(u8, endian); // major opcode
-            try reader.skipBytes(21,.{});
-            std.debug.print("Reply Error code: {d}, Details: {d}, Seq: {d}, Major: {d}, Minor: {d}\n", .{ code, info, seq, major, minor });
-
-            const message = try reader.readStruct(ErrorMessage);
-            std.debug.print("Error: {any}\n",.{message});
-
-            return error.ReplyError;
+            const error_message = std.mem.bytesAsValue(ErrorMessage, message[0..@sizeOf(ErrorMessage)]);
+            std.debug.print("Error: {any}\n", .{error_message});
+            return Message{ .error_message = error_message.* };
         },
-        1 => {
-            //success
-            std.debug.print("Reply success.",.{});
-        },
-        else => return error.InvalidResult,
+        else => return null,
     }
+    return null;
 }
 
-const ErrorMessage = extern struct{
-    error_code: ResultCodes,
+const Message = union(enum) {
+    error_message: ErrorMessage,
+};
+
+const ErrorMessage = struct {
+    result_code: u8, // already read to know it is an error
+    error_code: ErrorCodes,
     sequence_number: u16,
     details: u32,
     minor_opcode: u16,
     major_opcode: u8,
-    pad: [21]u8,
+    //pad: [21]u8, // error messages always have 32 bytes total
 };
 
-const ResultCodes = enum(u8) {
+const ErrorCodes = enum(u8) {
     NoError, // ??
     Request,
     Value,

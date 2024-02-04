@@ -28,7 +28,21 @@ pub fn connect() !std.net.Stream {
     std.debug.print("Socket path {s}\n", .{socket_path});
 
     var stream = try std.net.connectUnixSocket(socket_path);
+    try setTimeout(stream.handle);
     std.debug.print("Connected to {s}\n", .{socket_path});
 
     return stream;
+}
+
+fn setTimeout(socket: std.os.socket_t) !void {
+    const read_micros: i32 = 1000;
+    var read_timeout: std.os.timeval = undefined;
+    read_timeout.tv_sec = @as(c_long, @intCast(@divTrunc(read_micros, 1000000)));
+    read_timeout.tv_usec = @as(c_long, @intCast(@mod(read_micros, 1000000)));
+    try std.os.setsockopt(
+        socket,
+        std.os.SOL.SOCKET,
+        std.os.SO.RCVTIMEO,
+        std.mem.toBytes(read_timeout)[0..],
+    );
 }

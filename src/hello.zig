@@ -14,9 +14,10 @@ pub fn main() !void {
     try x11.setup();
 
     const window_id = try x11.createWindow(.{ .x = 10, .y = 50 });
-    try x11.mapWindow(123);
+    try x11.mapWindow(window_id);
 
-    try x11.receive();
+    const msg = try x11.receive();
+    std.debug.print("Message: {any}\n", .{msg});
 
     std.time.sleep(3 * std.time.ns_per_s);
 
