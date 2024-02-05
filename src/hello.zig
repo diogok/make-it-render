@@ -6,7 +6,7 @@ pub fn main() !void {
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() != .leak);
-    var allocator = gpa.allocator();
+    const allocator = gpa.allocator();
 
     var x11 = X11.init(allocator, .{}); // connect and setup
     defer x11.deinit();

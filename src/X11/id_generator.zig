@@ -8,8 +8,8 @@ pub const IDGenerator = struct {
     last: u32 = 0,
 
     pub fn init(resource_id_base: u32, resource_id_mask: u32) @This() {
-        var imask: i32 = @bitCast(resource_id_mask);
-        var inc = imask & -(imask);
+        const imask: i32 = @bitCast(resource_id_mask);
+        const inc = imask & -(imask);
 
         return .{
             .base = resource_id_base,

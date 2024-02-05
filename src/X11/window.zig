@@ -27,10 +27,10 @@ pub fn createWindowRequest(writer: anytype, window_id: u32, options: WindowOptio
         value_mask = value_mask | @intFromEnum(event_mask.mask);
     }
 
-    var value_mask_len: u16 = @intCast(options.value_masks.len);
-    var default_length: u16 = @sizeOf(CreateWindowRequest) / 4;
+    const value_mask_len: u16 = @intCast(options.value_masks.len);
+    const default_length: u16 = @sizeOf(CreateWindowRequest) / 4;
 
-    var request = CreateWindowRequest{
+    const request = CreateWindowRequest{
         .depth = options.depth,
         .length = default_length + value_mask_len,
         .window_id = window_id,
@@ -91,7 +91,7 @@ pub const WindowAttributes = enum(u32) {
 
 pub fn destroyWindowRequest(writer: anytype, window_id: u32) !void {
     std.debug.print("DestroyWindowRequest {d}\n", .{window_id});
-    var request = DestroyWindowRequest{ .window_id = window_id };
+    const request = DestroyWindowRequest{ .window_id = window_id };
     std.debug.print("DestroyWindowRequest: {any}\n", .{request});
     try writer.writeAll(&std.mem.toBytes(request));
 }
@@ -104,7 +104,7 @@ const DestroyWindowRequest = extern struct {
 
 pub fn mapWindowRequest(writer: anytype, window_id: u32) !void {
     std.debug.print("MapWindowRequest {d}\n", .{window_id});
-    var request = MapWindowRequest{ .window_id = window_id };
+    const request = MapWindowRequest{ .window_id = window_id };
     std.debug.print("MapWindowRequest: {any}\n", .{request});
     try writer.writeAll(&std.mem.toBytes(request));
 }
@@ -117,7 +117,7 @@ const MapWindowRequest = extern struct {
 
 pub fn unmapWindowRequest(writer: anytype, window_id: u32) !void {
     std.debug.print("UnmapWindowRequest {d}\n", .{window_id});
-    var request = UnmapWindowRequest{ .window_id = window_id };
+    const request = UnmapWindowRequest{ .window_id = window_id };
     std.debug.print("UnmapWindowRequest: {any}\n", .{request});
     try writer.writeAll(&std.mem.toBytes(request));
 }

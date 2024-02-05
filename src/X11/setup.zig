@@ -6,8 +6,7 @@ pub fn setup(allocator: std.mem.Allocator, connection: std.net.Stream) !Setup {
     const auth = try xauth.get_auth(allocator);
     defer auth.deinit();
 
-    //var writer = connection.writer();
-    var reader = connection.reader();
+    const reader = connection.reader();
 
     try setupRequest(connection, auth.name, auth.data);
     const xdata = try setupReply(allocator, reader);
@@ -16,7 +15,7 @@ pub fn setup(allocator: std.mem.Allocator, connection: std.net.Stream) !Setup {
 }
 
 fn setupRequest(writer: anytype, auth_name: []const u8, auth_data: []const u8) !void {
-    var request_base = SetupRequest{
+    const request_base = SetupRequest{
         .auth_name_len = @intCast(auth_name.len),
         .auth_data_len = @intCast(auth_data.len),
     };
@@ -32,8 +31,8 @@ fn setupRequest(writer: anytype, auth_name: []const u8, auth_data: []const u8) !
 
 const SetupRequest = extern struct {
     byte_order: u8 = switch (endian) {
-        .Big => 'B',
-        .Little => 'l',
+        .big => 'B',
+        .little => 'l',
     },
     pad0: u8 = 0,
     protocol_major_version: u16 = 11,
@@ -57,9 +56,9 @@ fn setupReply(allocator: std.mem.Allocator, reader: anytype) !Setup {
     const reply_len = try reader.readInt(u16, endian); // size of rest of data
     std.debug.print("Size of response: {d} * 4 = {d}\n", .{ reply_len, reply_len * 4 });
 
-    var reply = try allocator.alloc(u8, reply_len * 4);
+    const reply = try allocator.alloc(u8, reply_len * 4);
     defer allocator.free(reply);
-    var read_len = try reader.read(reply); // read rest of response
+    const read_len = try reader.read(reply); // read rest of response
     std.debug.print("Read from reply {d}\n", .{read_len});
 
     switch (status) {

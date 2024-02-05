@@ -32,7 +32,7 @@ pub fn connect(options: ConnectionOptions) !std.net.Stream {
     const socket_path = try get_socket_path(&buffer);
     std.debug.print("Socket path {s}\n", .{socket_path});
 
-    var stream = try std.net.connectUnixSocket(socket_path);
+    const stream = try std.net.connectUnixSocket(socket_path);
     try setTimeout(stream.handle, options.read_timeout, options.write_timeout);
     std.debug.print("Connected to {s}\n", .{socket_path});
 

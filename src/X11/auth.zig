@@ -1,4 +1,6 @@
 const std = @import("std");
+const endian = @import("builtin").cpu.arch.endian();
+
 
 fn open_xauth_file() !std.fs.File {
     if (std.os.getenv("XAUTHORITY")) |file| {
@@ -19,20 +21,20 @@ fn read_xauth_file(allocator: std.mem.Allocator, xauth_file: std.fs.File) !XAuth
 
     // Skip unsupported fields
     try xauth_reader.skipBytes(2, .{}); // skip family
-    var skip = try xauth_reader.readIntBig(u16); // size of address
-    try xauth_reader.skipBytes(skip, .{}); // skip address
-    skip = try xauth_reader.readIntBig(u16); // size of number
-    try xauth_reader.skipBytes(skip, .{}); // skip number
+    const address_len = try xauth_reader.readInt(u16,.big); // size of address
+    try xauth_reader.skipBytes(address_len, .{}); // skip address
+    const number_len = try xauth_reader.readInt(u16,.big); // size of number
+    try xauth_reader.skipBytes(number_len, .{}); // skip number
 
     // Read auth name
-    var xauth_name_len = try xauth_reader.readIntBig(u16); // size of xauth name
-    var xauth_name = try allocator.alloc(u8, xauth_name_len);
+    const xauth_name_len = try xauth_reader.readInt(u16,.big); // size of xauth name
+    const xauth_name = try allocator.alloc(u8, xauth_name_len);
     errdefer allocator.free(xauth_name);
     _ = try xauth_reader.read(xauth_name); // read name
 
     // Read auth data
-    var xauth_data_len = try xauth_reader.readIntBig(u16); // size of xauth data
-    var xauth_data = try allocator.alloc(u8, xauth_data_len);
+    const xauth_data_len = try xauth_reader.readInt(u16,.big); // size of xauth data
+    const xauth_data = try allocator.alloc(u8, xauth_data_len);
     errdefer allocator.free(xauth_data);
     _ = try xauth_reader.read(xauth_data); // read data
 
@@ -62,7 +64,7 @@ pub const XAuth = struct {
 };
 
 pub fn get_auth(allocator: std.mem.Allocator) !XAuth {
-    var xauth_file = try open_xauth_file();
-    var xauth = try read_xauth_file(allocator, xauth_file);
+    const xauth_file = try open_xauth_file();
+    const xauth = try read_xauth_file(allocator, xauth_file);
     return xauth;
 }
