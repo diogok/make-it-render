@@ -1,5 +1,4 @@
 const std = @import("std");
-const endian = @import("builtin").cpu.arch.endian();
 
 pub const WindowOptions = struct {
     x: i16 = 0,

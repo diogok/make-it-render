@@ -1,5 +1,4 @@
 const std = @import("std");
-const endian = @import("builtin").cpu.arch.endian();
 
 const xconnection = @import("connection.zig");
 const xauth = @import("auth.zig");
@@ -35,7 +34,7 @@ const X11 = struct {
     }
 
     pub fn connect(self: *@This()) !void {
-        self.connection = try xconnection.connect();
+        self.connection = try xconnection.connect(.{.read_timeout=10000});
     }
 
     pub fn setup(self: *@This()) !void {
@@ -54,7 +53,6 @@ const X11 = struct {
     pub fn createWindow(self: *@This(), src_options: xwindow.WindowOptions) !u32 {
         const options = withDefaultWindowOptions(self.xdata.?.screen, src_options);
         const window_id = try self.genID();
-
         try xwindow.createWindowRequest(self.connection.?, window_id, options);
         return window_id;
     }
@@ -89,6 +87,8 @@ fn withDefaultWindowOptions(screen: xsetup.Screen, _: xwindow.WindowOptions) xwi
     options.depth = screen.root_depth;
     options.visual_id = screen.root_visual;
     options.colormap = screen.colormap;
+
+    // TODO: override from src
 
     return options;
 }

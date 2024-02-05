@@ -19,7 +19,12 @@ fn get_socket_path(buffer: []u8) ![]const u8 {
     return socket_path;
 }
 
-pub fn connect() !std.net.Stream {
+pub const ConnectionOptions = struct{
+    read_timeout: i32=0, // in microseconds
+    write_timeout: i32=0,  // in microseconds
+};
+
+pub fn connect(options: ConnectionOptions) !std.net.Stream {
     std.debug.print("Connecting...\n", .{});
 
     // TODO: assuming unix socket
@@ -28,21 +33,34 @@ pub fn connect() !std.net.Stream {
     std.debug.print("Socket path {s}\n", .{socket_path});
 
     var stream = try std.net.connectUnixSocket(socket_path);
-    try setTimeout(stream.handle);
+    try setTimeout(stream.handle, options.read_timeout, options.write_timeout);
     std.debug.print("Connected to {s}\n", .{socket_path});
 
     return stream;
 }
 
-fn setTimeout(socket: std.os.socket_t) !void {
-    const read_micros: i32 = 1000;
-    var read_timeout: std.os.timeval = undefined;
-    read_timeout.tv_sec = @as(c_long, @intCast(@divTrunc(read_micros, 1000000)));
-    read_timeout.tv_usec = @as(c_long, @intCast(@mod(read_micros, 1000000)));
-    try std.os.setsockopt(
-        socket,
-        std.os.SOL.SOCKET,
-        std.os.SO.RCVTIMEO,
-        std.mem.toBytes(read_timeout)[0..],
-    );
+fn setTimeout(socket: std.os.socket_t, read_timeout: i32, write_timeout: i32) !void {
+    if(read_timeout > 0){
+        var timeout: std.os.timeval = undefined;
+        timeout.tv_sec = @as(c_long, @intCast(@divTrunc(read_timeout, 1000000)));
+        timeout.tv_usec = @as(c_long, @intCast(@mod(read_timeout, 1000000)));
+        try std.os.setsockopt(
+            socket,
+            std.os.SOL.SOCKET,
+            std.os.SO.RCVTIMEO,
+            std.mem.toBytes(timeout)[0..],
+        );
+    }
+
+    if(write_timeout > 0) {
+        var timeout: std.os.timeval = undefined;
+        timeout.tv_sec = @as(c_long, @intCast(@divTrunc(write_timeout, 1000000)));
+        timeout.tv_usec = @as(c_long, @intCast(@mod(write_timeout, 1000000)));
+        try std.os.setsockopt(
+            socket,
+            std.os.SOL.SOCKET,
+            std.os.SO.SNDTIMEO,
+            std.mem.toBytes(timeout)[0..],
+        );
+    }
 }

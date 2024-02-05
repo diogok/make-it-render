@@ -13,7 +13,7 @@ pub fn build(b: *std.build.Builder) !void {
     });
 
     b.installArtifact(exe);
-
+    
     const run_cmd = b.addRunArtifact(exe);
     const run_step = b.step("run", "Run hello world");
     run_step.dependOn(&run_cmd.step);
