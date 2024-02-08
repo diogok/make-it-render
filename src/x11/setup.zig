@@ -29,7 +29,7 @@ fn setupRequest(writer: anytype, auth_name: []const u8, auth_data: []const u8) !
     try writer.writeAll(pad[0..(auth_data.len % 4)]);
 }
 
-const SetupRequest = extern struct {
+pub const SetupRequest = extern struct {
     byte_order: u8 = switch (endian) {
         .big => 'B',
         .little => 'l',
@@ -99,7 +99,7 @@ fn setupReply(allocator: std.mem.Allocator, reader: anytype) !Setup {
     return result;
 }
 
-const StatusReply = extern struct {
+pub const StatusReply = extern struct {
     status: u8,
     pad: u8,
     major_version: u16,
@@ -107,7 +107,7 @@ const StatusReply = extern struct {
     reply_len: u16,
 };
 
-const SetupReply = extern struct {
+pub const SetupReply = extern struct {
     release_number: u32,
     resource_id_base: u32,
     resource_id_mask: u32,
@@ -178,7 +178,7 @@ pub const Setup = struct {
     }
 };
 
-const FormatReply = extern struct {
+pub const FormatReply = extern struct {
     depth: u8,
     bits_per_pixel: u8,
     scanline_pad: u8,
@@ -250,14 +250,14 @@ pub const Screen = struct {
     }
 };
 
-const DepthReply = extern struct {
+pub const DepthReply = extern struct {
     depth: u8,
     pad0: [1]u8,
     visual_type_len: u16,
     pad1: [4]u8,
 };
 
-const Depth = struct {
+pub const Depth = struct {
     depth: u8,
     visual_types: []VisualType = &[_]VisualType{},
 
@@ -272,7 +272,7 @@ const Depth = struct {
     }
 };
 
-const VisualTypeReply = extern struct {
+pub const VisualTypeReply = extern struct {
     visual_id: u32,
     class: VisualTypeClass,
     bits_per_rgb_value: u8,
@@ -283,7 +283,7 @@ const VisualTypeReply = extern struct {
     pad: [4]u8,
 };
 
-const VisualTypeClass = enum(u8) {
+pub const VisualTypeClass = enum(u8) {
     StaticGray = 0,
     GrayScale = 1,
     StaticColor = 2,
@@ -292,7 +292,7 @@ const VisualTypeClass = enum(u8) {
     DirectColor = 5,
 };
 
-const VisualType = struct {
+pub const VisualType = struct {
     visual_id: u32,
     class: VisualTypeClass,
     bits_per_rgb_value: u8,
