@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const IDGenerator = struct {
+pub const XID = struct {
     base: u32,
     inc: u32,
     max: u32,
@@ -28,3 +28,4 @@ pub const IDGenerator = struct {
         return self.last | self.base;
     }
 };
+

@@ -9,7 +9,7 @@ pub fn build(b: *std.Build) !void {
         .name = name,
         .target = target,
         .optimize = optimize,
-        .root_source_file = .{ .path = "src/hello.zig" },
+        .root_source_file = .{ .path = "src/examples/hello.zig" },
     });
 
     const x11 = b.anonymousDependency("src/x11", @import("src/x11/build.zig"), .{});

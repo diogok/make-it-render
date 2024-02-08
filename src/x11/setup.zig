@@ -1,6 +1,6 @@
 const std = @import("std");
-const endian = @import("builtin").cpu.arch.endian();
 const xauth = @import("auth.zig");
+const endian = @import("builtin").cpu.arch.endian();
 
 pub fn setup(allocator: std.mem.Allocator, connection: std.net.Stream) !Setup {
     const auth = try xauth.get_auth(allocator);
@@ -43,15 +43,11 @@ const SetupRequest = extern struct {
 };
 
 fn setupReply(allocator: std.mem.Allocator, reader: anytype) !Setup {
-    std.debug.print("Setup Reply\n", .{});
-
     const status_reply = try reader.readStruct(StatusReply);
-    std.debug.print("Setup status {any}\n", .{status_reply});
 
     const reply = try allocator.alloc(u8, status_reply.reply_len * 4);
     defer allocator.free(reply);
-    const read_len = try reader.read(reply); // read rest of response
-    std.debug.print("Read from rest of reply {d}\n", .{read_len});
+    _ = try reader.read(reply); // read rest of response
 
     switch (status_reply.status) {
         0 => return error.SetupFailed,
@@ -62,10 +58,8 @@ fn setupReply(allocator: std.mem.Allocator, reader: anytype) !Setup {
 
     var reply_stream = std.io.fixedBufferStream(reply);
     var reply_reader = reply_stream.reader();
-    std.debug.print("Reply len: {d}\n", .{reply.len});
 
     const base_reply = try reply_reader.readStruct(SetupReply);
-    std.debug.print("Reply base: {any}\n", .{base_reply});
 
     const vendor = try allocator.alloc(u8, base_reply.vendor_len);
     defer allocator.free(vendor);
@@ -93,14 +87,14 @@ fn setupReply(allocator: std.mem.Allocator, reader: anytype) !Setup {
                 const visual_type_reply = try reply_reader.readStruct(VisualTypeReply);
                 visual_types[visual_type_index] = VisualType.initFromReply(visual_type_reply);
             }
+            allowed_depths[depth_index].visual_types = visual_types;
         }
+        screens[screen_index].allowed_depths = allowed_depths;
     }
 
     var result = Setup.initFromReply(allocator, base_reply);
     result.screens = screens;
     result.formats = formats;
-
-    std.debug.print("Setup reply: {any}\n", .{result});
 
     return result;
 }
@@ -249,10 +243,10 @@ pub const Screen = struct {
     }
 
     pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
-        allocator.free(self.allowed_depths);
         for (self.allowed_depths) |depth| {
             depth.deinit(allocator);
         }
+        allocator.free(self.allowed_depths);
     }
 };
 
