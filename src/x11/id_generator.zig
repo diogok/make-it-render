@@ -25,7 +25,6 @@ pub const IDGenerator = struct {
         } else {
             self.last += self.inc;
         }
-        const xid: u32 = self.last | self.base;
-        return xid;
+        return self.last | self.base;
     }
 };

@@ -42,7 +42,6 @@ const SetupRequest = extern struct {
     pad1: u16 = 0,
 };
 
-
 fn setupReply(allocator: std.mem.Allocator, reader: anytype) !Setup {
     std.debug.print("Setup Reply\n", .{});
 
@@ -71,26 +70,26 @@ fn setupReply(allocator: std.mem.Allocator, reader: anytype) !Setup {
     const vendor = try allocator.alloc(u8, base_reply.vendor_len);
     defer allocator.free(vendor);
     _ = try reply_reader.read(vendor);
-    _ = try reply_reader.skipBytes(vendor.len % 4,.{}); // pad vendor
+    _ = try reply_reader.skipBytes(vendor.len % 4, .{}); // pad vendor
 
-    const formats = try allocator.alloc(Format,base_reply.pixmap_formats_len);
-    for(formats, 0..) |_,format_index| {
+    const formats = try allocator.alloc(Format, base_reply.pixmap_formats_len);
+    for (formats, 0..) |_, format_index| {
         const format_reply = try reply_reader.readStruct(FormatReply);
         formats[format_index] = Format.initFromReply(format_reply);
     }
 
     const screens = try allocator.alloc(Screen, base_reply.roots_len);
-    for(screens, 0..) |_,screen_index| {
+    for (screens, 0..) |_, screen_index| {
         const root_reply = try reply_reader.readStruct(RootReply);
         screens[screen_index] = Screen.initFromReply(root_reply);
 
-        const allowed_depths = try allocator.alloc(Depth,root_reply.allowed_depths_len);
-        for(allowed_depths, 0..) |_,depth_index| {
+        const allowed_depths = try allocator.alloc(Depth, root_reply.allowed_depths_len);
+        for (allowed_depths, 0..) |_, depth_index| {
             const depth_reply = try reply_reader.readStruct(DepthReply);
             allowed_depths[depth_index] = Depth.initFromReply(depth_reply);
 
             const visual_types = try allocator.alloc(VisualType, depth_reply.visual_type_len);
-            for(visual_types, 0..) |_,visual_type_index| {
+            for (visual_types, 0..) |_, visual_type_index| {
                 const visual_type_reply = try reply_reader.readStruct(VisualTypeReply);
                 visual_types[visual_type_index] = VisualType.initFromReply(visual_type_reply);
             }
@@ -106,7 +105,7 @@ fn setupReply(allocator: std.mem.Allocator, reader: anytype) !Setup {
     return result;
 }
 
-const StatusReply = extern struct{
+const StatusReply = extern struct {
     status: u8,
     pad: u8,
     major_version: u16,
@@ -177,14 +176,13 @@ pub const Setup = struct {
     }
 
     pub fn deinit(self: @This()) void {
-        for(self.screens) |screen| {
+        for (self.screens) |screen| {
             screen.deinit(self.allocator);
         }
         self.allocator.free(self.screens);
         self.allocator.free(self.formats);
     }
 };
-
 
 const FormatReply = extern struct {
     depth: u8,
@@ -193,7 +191,7 @@ const FormatReply = extern struct {
     pad: [5]u8,
 };
 
-pub const Format = struct{
+pub const Format = struct {
     depth: u8,
     bits_per_pixel: u8,
     scanline_pad: u8,
@@ -201,14 +199,13 @@ pub const Format = struct{
     pub fn initFromReply(reply: FormatReply) @This() {
         return .{
             .depth = reply.depth,
-            .bits_per_pixel =reply.bits_per_pixel,
+            .bits_per_pixel = reply.bits_per_pixel,
             .scanline_pad = reply.scanline_pad,
         };
     }
-
 };
 
-const RootReply = extern struct{
+const RootReply = extern struct {
     root: u32,
     colormap: u32,
     white_pixel: u32,
@@ -238,7 +235,7 @@ pub const Screen = struct {
     black_pixel: u32,
     root_visual: u32,
     root_depth: u8,
-    allowed_depths: []const Depth=&[_]Depth{},
+    allowed_depths: []const Depth = &[_]Depth{},
 
     pub fn initFromReply(reply: RootReply) @This() {
         return .{
@@ -253,22 +250,22 @@ pub const Screen = struct {
 
     pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
         allocator.free(self.allowed_depths);
-        for(self.allowed_depths) |depth| {
+        for (self.allowed_depths) |depth| {
             depth.deinit(allocator);
         }
     }
 };
 
-const DepthReply = extern struct{
+const DepthReply = extern struct {
     depth: u8,
     pad0: [1]u8,
     visual_type_len: u16,
     pad1: [4]u8,
 };
 
-const Depth = struct{
+const Depth = struct {
     depth: u8,
-    visual_types: []VisualType=&[_]VisualType{},
+    visual_types: []VisualType = &[_]VisualType{},
 
     pub fn initFromReply(reply: DepthReply) @This() {
         return .{
@@ -281,7 +278,7 @@ const Depth = struct{
     }
 };
 
-const VisualTypeReply = extern struct{
+const VisualTypeReply = extern struct {
     visual_id: u32,
     class: VisualTypeClass,
     bits_per_rgb_value: u8,
@@ -294,14 +291,14 @@ const VisualTypeReply = extern struct{
 
 const VisualTypeClass = enum(u8) {
     StaticGray = 0,
-              GrayScale = 1,
-             StaticColor = 2,
-             PseudoColor = 3,
-             TrueColor = 4,
-             DirectColor = 5,
+    GrayScale = 1,
+    StaticColor = 2,
+    PseudoColor = 3,
+    TrueColor = 4,
+    DirectColor = 5,
 };
 
-const VisualType = struct{
+const VisualType = struct {
     visual_id: u32,
     class: VisualTypeClass,
     bits_per_rgb_value: u8,
@@ -321,6 +318,4 @@ const VisualType = struct{
             .blue_mask = reply.blue_mask,
         };
     }
-
 };
-

@@ -10,15 +10,9 @@ pub const PixmapOptions = struct {
 };
 
 pub fn createPixmap(writer: anytype, pixmap_id: u32, options: PixmapOptions) !void {
-    std.debug.print("createPixmap {d}, options: {any}\n", .{ pixmap_id, options});
+    std.debug.print("createPixmap {d}, options: {any}\n", .{ pixmap_id, options });
 
-    const request = CreatePixmapRequest{
-        .depth = options.depth,
-        .pixmap_id = pixmap_id,
-        .drawable_id = options.drawable_id,
-        .height = options.height,
-        .width = options.width
-    };
+    const request = CreatePixmapRequest{ .depth = options.depth, .pixmap_id = pixmap_id, .drawable_id = options.drawable_id, .height = options.height, .width = options.width };
 
     std.debug.print("createPixmapRequest: {any}\n", .{request});
 
@@ -47,7 +41,6 @@ pub fn freePixmap(writer: anytype, pixmap_id: u32) !void {
 const FreePixmapRequest = extern struct {
     opcode: u8 = 54,
     pad0: u8 = 0,
-    length: u16 = @sizeOf(@This()) / 4, // length=2
+    length: u16 = @sizeOf(@This()) / 4,
     pixmap_id: u32,
 };
-

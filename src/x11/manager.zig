@@ -1,9 +1,8 @@
 const std = @import("std");
 
 const xconnection = @import("connection.zig");
-const xauth = @import("auth.zig");
 const xsetup = @import("setup.zig");
-const id_generator = @import("id_generator.zig");
+const xid_generator = @import("id_generator.zig");
 const xwindow = @import("window.zig");
 const xgraphic_context = @import("graphic_context.zig");
 const xpixmap = @import("pixmap.zig");
@@ -15,13 +14,13 @@ const X11Options = struct {};
 
 // TODO: probably should be single threaded
 
-const X11 = struct {
+pub const Manager = struct {
     options: X11Options = .{},
     allocator: std.mem.Allocator,
 
     connection: ?std.net.Stream = null,
     xdata: ?xsetup.Setup = null,
-    id_gen: ?id_generator.IDGenerator = null,
+    id_gen: ?xid_generator.IDGenerator = null,
 
     pub fn init(allocator: std.mem.Allocator, options: X11Options) @This() {
         return .{
@@ -37,13 +36,13 @@ const X11 = struct {
     }
 
     pub fn connect(self: *@This()) !void {
-        self.connection = try xconnection.connect(.{.read_timeout=5000});
+        self.connection = try xconnection.connect(.{ .read_timeout = 5000 });
     }
 
     pub fn setup(self: *@This()) !void {
         if (self.connection) |conn| {
             self.xdata = try xsetup.setup(self.allocator, conn);
-            self.id_gen = id_generator.IDGenerator.init(self.xdata.?.resource_id_base, self.xdata.?.resource_id_mask);
+            self.id_gen = xid_generator.IDGenerator.init(self.xdata.?.resource_id_base, self.xdata.?.resource_id_mask);
         } else {
             return error.NotConnected;
         }
@@ -74,7 +73,7 @@ const X11 = struct {
 
     pub fn createGraphicContext(self: *@This(), options: xgraphic_context.GraphicContextOptions) !u32 {
         const graphic_context_id = try self.genID();
-        try xgraphic_context.createGraphicContext(self.connection.?, graphic_context_id,options);
+        try xgraphic_context.createGraphicContext(self.connection.?, graphic_context_id, options);
         return graphic_context_id;
     }
 
@@ -84,7 +83,7 @@ const X11 = struct {
 
     pub fn createPixmap(self: *@This(), options: xpixmap.PixmapOptions) !u32 {
         const pixmap_id = try self.genID();
-        try xpixmap.createPixmap(self.connection.?,pixmap_id, options);
+        try xpixmap.createPixmap(self.connection.?, pixmap_id, options);
         return pixmap_id;
     }
 
@@ -93,7 +92,7 @@ const X11 = struct {
     }
 
     pub fn putImage(self: *@This(), data: []const u8, options: xdraw.PutImageOptions) !void {
-        try xdraw.putImage(self.connection.?,data, options);
+        try xdraw.putImage(self.connection.?, data, options);
     }
 
     pub fn copyArea(self: *@This(), options: xdraw.CopyAreaOptions) !void {
@@ -109,7 +108,7 @@ const X11 = struct {
     }
 };
 
-pub const init = X11.init;
+pub const init = Manager.init;
 
 fn withDefaultWindowOptions(screen: xsetup.Screen, _: xwindow.WindowOptions) xwindow.WindowOptions {
     var options = xwindow.WindowOptions{};

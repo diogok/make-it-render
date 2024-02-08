@@ -6,14 +6,14 @@ pub const PutImageOptions = struct {
     graphic_context_id: u32 = 0,
     width: u16 = 640,
     height: u16 = 480,
-    x: i16=0,
-    y: i16=0,
-    left_pad: u8 =0,
+    x: i16 = 0,
+    y: i16 = 0,
+    left_pad: u8 = 0,
     depth: u8 = 24,
 };
 
 pub fn putImage(writer: anytype, data: []const u8, options: PutImageOptions) !void {
-    std.debug.print("putImage {any} ({d})\n", .{ options, data.len});
+    std.debug.print("putImage {any} ({d})\n", .{ options, data.len });
 
     const data_len: u16 = @intCast(data.len / 4);
     const default_length: u16 = @sizeOf(PutImageRequest) / 4;
@@ -52,9 +52,8 @@ const PutImageRequest = extern struct {
     y: i16 = 0,
     left_pad: u8 = 0,
     depth: u8 = 24,
-    pad: u16= 0,
+    pad: u16 = 0,
 };
-
 
 const ImageFormat = enum(u8) {
     XYBitmap = 0,
@@ -75,7 +74,7 @@ pub const CopyAreaOptions = struct {
 };
 
 pub fn copyArea(writer: anytype, options: CopyAreaOptions) !void {
-    std.debug.print("copyArea {any}\n", .{ options});
+    std.debug.print("copyArea {any}\n", .{options});
 
     const request = CopyAreaRequest{
         .src_drawable_id = options.src_drawable_id,
@@ -110,4 +109,3 @@ const CopyAreaRequest = extern struct {
     width: u16 = 0,
     height: u16 = 0,
 };
-

@@ -43,7 +43,7 @@ pub fn createGraphicContext(writer: anytype, graphic_context_id: u32, options: G
 
 const CreateGraphicContextRequest = extern struct {
     opcode: u8 = 55,
-    pad: u8=0,
+    pad: u8 = 0,
     length: u16 = (@sizeOf(@This()) / 4),
     graphic_context_id: u32,
     drawable_id: u32,
@@ -67,4 +67,3 @@ const FreeGraphicContextRequest = extern struct {
     length: u16 = @sizeOf(@This()) / 4, // length=2
     graphic_context_id: u32,
 };
-

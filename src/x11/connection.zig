@@ -19,9 +19,9 @@ fn get_socket_path(buffer: []u8) ![]const u8 {
     return socket_path;
 }
 
-pub const ConnectionOptions = struct{
-    read_timeout: i32=0, // in microseconds
-    write_timeout: i32=0,  // in microseconds
+pub const ConnectionOptions = struct {
+    read_timeout: i32 = 0, // in microseconds
+    write_timeout: i32 = 0, // in microseconds
 };
 
 pub fn connect(options: ConnectionOptions) !std.net.Stream {
@@ -40,7 +40,7 @@ pub fn connect(options: ConnectionOptions) !std.net.Stream {
 }
 
 fn setTimeout(socket: std.os.socket_t, read_timeout: i32, write_timeout: i32) !void {
-    if(read_timeout > 0){
+    if (read_timeout > 0) {
         var timeout: std.os.timeval = undefined;
         timeout.tv_sec = @as(c_long, @intCast(@divTrunc(read_timeout, 1000000)));
         timeout.tv_usec = @as(c_long, @intCast(@mod(read_timeout, 1000000)));
@@ -52,7 +52,7 @@ fn setTimeout(socket: std.os.socket_t, read_timeout: i32, write_timeout: i32) !v
         );
     }
 
-    if(write_timeout > 0) {
+    if (write_timeout > 0) {
         var timeout: std.os.timeval = undefined;
         timeout.tv_sec = @as(c_long, @intCast(@divTrunc(write_timeout, 1000000)));
         timeout.tv_usec = @as(c_long, @intCast(@mod(write_timeout, 1000000)));

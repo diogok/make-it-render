@@ -1,7 +1,6 @@
 const std = @import("std");
 const endian = @import("builtin").cpu.arch.endian();
 
-
 fn open_xauth_file() !std.fs.File {
     if (std.os.getenv("XAUTHORITY")) |file| {
         std.debug.print("Xauthority file: {s}\n", .{file});
@@ -21,19 +20,19 @@ fn read_xauth_file(allocator: std.mem.Allocator, xauth_file: std.fs.File) !XAuth
 
     // Skip unsupported fields
     try xauth_reader.skipBytes(2, .{}); // skip family
-    const address_len = try xauth_reader.readInt(u16,.big); // size of address
+    const address_len = try xauth_reader.readInt(u16, .big); // size of address
     try xauth_reader.skipBytes(address_len, .{}); // skip address
-    const number_len = try xauth_reader.readInt(u16,.big); // size of number
+    const number_len = try xauth_reader.readInt(u16, .big); // size of number
     try xauth_reader.skipBytes(number_len, .{}); // skip number
 
     // Read auth name
-    const xauth_name_len = try xauth_reader.readInt(u16,.big); // size of xauth name
+    const xauth_name_len = try xauth_reader.readInt(u16, .big); // size of xauth name
     const xauth_name = try allocator.alloc(u8, xauth_name_len);
     errdefer allocator.free(xauth_name);
     _ = try xauth_reader.read(xauth_name); // read name
 
     // Read auth data
-    const xauth_data_len = try xauth_reader.readInt(u16,.big); // size of xauth data
+    const xauth_data_len = try xauth_reader.readInt(u16, .big); // size of xauth data
     const xauth_data = try allocator.alloc(u8, xauth_data_len);
     errdefer allocator.free(xauth_data);
     _ = try xauth_reader.read(xauth_data); // read data

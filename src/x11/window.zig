@@ -13,9 +13,9 @@ pub const WindowOptions = struct {
     border_width: u16 = 0,
     window_class: WindowClass = .InputOutput,
     value_mask: []const ValueMask = &[_]ValueMask{
-        .{.mask=.back_pixel,.value=0},
-        .{.mask=.colormap,.value=73},
-        },
+        .{ .mask = .back_pixel, .value = 0 },
+        .{ .mask = .colormap, .value = 73 },
+    },
 };
 
 pub const ValueMask = struct {
@@ -24,9 +24,9 @@ pub const ValueMask = struct {
 };
 
 pub const WindowClass = enum(u16) {
-    Parent=0,
-    InputOutput=1,
-    InputOnly=2,
+    Parent = 0,
+    InputOutput = 1,
+    InputOnly = 2,
 };
 
 pub fn createWindowRequest(writer: anytype, window_id: u32, options: WindowOptions) !void {

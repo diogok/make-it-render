@@ -12,6 +12,9 @@ pub fn build(b: *std.Build) !void {
         .root_source_file = .{ .path = "src/hello.zig" },
     });
 
+    const x11 = b.anonymousDependency("src/x11", @import("src/x11/build.zig"), .{});
+    exe.root_module.addImport("x11", x11.module("x11"));
+
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
