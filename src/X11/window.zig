@@ -1,5 +1,7 @@
 const std = @import("std");
 
+// TODO: logger
+
 pub const WindowOptions = struct {
     x: i16 = 0,
     y: i16 = 0,
@@ -9,9 +11,11 @@ pub const WindowOptions = struct {
     parent_window: u32 = 0,
     visual_id: u32 = 0,
     border_width: u16 = 0,
-    window_class: u16 = 1, // TODO: enum
-    colormap: u32 = 0,
-    value_masks: []const ValueMask = &[_]ValueMask{},
+    window_class: WindowClass = .InputOutput,
+    value_mask: []const ValueMask = &[_]ValueMask{
+        .{.mask=.back_pixel,.value=0},
+        .{.mask=.colormap,.value=73},
+        },
 };
 
 pub const ValueMask = struct {
@@ -19,15 +23,21 @@ pub const ValueMask = struct {
     value: u32,
 };
 
+pub const WindowClass = enum(u16) {
+    Parent=0,
+    InputOutput=1,
+    InputOnly=2,
+};
+
 pub fn createWindowRequest(writer: anytype, window_id: u32, options: WindowOptions) !void {
     std.debug.print("CreateWindowRequest {d}, options: {any}\n", .{ window_id, options });
 
     var value_mask: u32 = 0;
-    for (options.value_masks) |event_mask| {
+    for (options.value_mask) |event_mask| {
         value_mask = value_mask | @intFromEnum(event_mask.mask);
     }
 
-    const value_mask_len: u16 = @intCast(options.value_masks.len);
+    const value_mask_len: u16 = @intCast(options.value_mask.len);
     const default_length: u16 = @sizeOf(CreateWindowRequest) / 4;
 
     const request = CreateWindowRequest{
@@ -40,7 +50,7 @@ pub fn createWindowRequest(writer: anytype, window_id: u32, options: WindowOptio
         .width = options.width,
         .height = options.height,
         .border_width = options.border_width,
-        .window_class = options.window_class,
+        .window_class = @intFromEnum(options.window_class),
         .visual_id = options.visual_id,
         .value_mask = value_mask,
     };
@@ -49,7 +59,7 @@ pub fn createWindowRequest(writer: anytype, window_id: u32, options: WindowOptio
 
     try writer.writeAll(&std.mem.toBytes(request));
 
-    for (options.value_masks) |event_mask| {
+    for (options.value_mask) |event_mask| {
         try writer.writeAll(&std.mem.toBytes(event_mask.value));
     }
     std.debug.print("CreateWindowRequest sent\n", .{});
@@ -83,7 +93,7 @@ pub const WindowAttributes = enum(u32) {
     backing_pixel = 256,
     override_redirect = 512,
     save_under = 1024,
-    event_mask = 2048,
+    event_mask = 2048, // TODO: event mask enum
     dont_propagate = 4096,
     colormap = 8192,
     cursor = 16348,

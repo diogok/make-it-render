@@ -5,6 +5,9 @@ const xauth = @import("auth.zig");
 const xsetup = @import("setup.zig");
 const id_generator = @import("id_generator.zig");
 const xwindow = @import("window.zig");
+const xgraphic_context = @import("graphic_context.zig");
+const xpixmap = @import("pixmap.zig");
+const xdraw = @import("draw.zig");
 
 const X11Options = struct {};
 
@@ -34,7 +37,7 @@ const X11 = struct {
     }
 
     pub fn connect(self: *@This()) !void {
-        self.connection = try xconnection.connect(.{.read_timeout=10000});
+        self.connection = try xconnection.connect(.{.read_timeout=5000});
     }
 
     pub fn setup(self: *@This()) !void {
@@ -51,7 +54,7 @@ const X11 = struct {
     }
 
     pub fn createWindow(self: *@This(), src_options: xwindow.WindowOptions) !u32 {
-        const options = withDefaultWindowOptions(self.xdata.?.screen, src_options);
+        const options = withDefaultWindowOptions(self.xdata.?.screens[0], src_options);
         const window_id = try self.genID();
         try xwindow.createWindowRequest(self.connection.?, window_id, options);
         return window_id;
@@ -67,6 +70,34 @@ const X11 = struct {
 
     pub fn unmapWindow(self: *@This(), window_id: u32) !void {
         try xwindow.unmapWindowRequest(self.connection.?, window_id);
+    }
+
+    pub fn createGraphicContext(self: *@This(), options: xgraphic_context.GraphicContextOptions) !u32 {
+        const graphic_context_id = try self.genID();
+        try xgraphic_context.createGraphicContext(self.connection.?, graphic_context_id,options);
+        return graphic_context_id;
+    }
+
+    pub fn freeGraphicContext(self: *@This(), graphic_context_id: u32) !void {
+        try xgraphic_context.freeGraphicContext(self.connection.?, graphic_context_id);
+    }
+
+    pub fn createPixmap(self: *@This(), options: xpixmap.PixmapOptions) !u32 {
+        const pixmap_id = try self.genID();
+        try xpixmap.createPixmap(self.connection.?,pixmap_id, options);
+        return pixmap_id;
+    }
+
+    pub fn freePixmap(self: *@This(), pixmap_id: u32) !void {
+        try xpixmap.freePixmap(self.connection.?, pixmap_id);
+    }
+
+    pub fn putImage(self: *@This(), data: []const u8, options: xdraw.PutImageOptions) !void {
+        try xdraw.putImage(self.connection.?,data, options);
+    }
+
+    pub fn copyArea(self: *@This(), options: xdraw.CopyAreaOptions) !void {
+        try xdraw.copyArea(self.connection.?, options);
     }
 
     pub fn receive(self: *@This()) !?Message {
@@ -86,7 +117,6 @@ fn withDefaultWindowOptions(screen: xsetup.Screen, _: xwindow.WindowOptions) xwi
     options.parent_window = screen.root;
     options.depth = screen.root_depth;
     options.visual_id = screen.root_visual;
-    options.colormap = screen.colormap;
 
     // TODO: override from src
 
@@ -122,7 +152,7 @@ const Message = union(enum) {
     error_message: ErrorMessage,
 };
 
-const ErrorMessage = struct {
+const ErrorMessage = extern struct {
     result_code: u8, // already read to know it is an error
     error_code: ErrorCodes,
     sequence_number: u16,
