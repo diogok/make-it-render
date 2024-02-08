@@ -1,4 +1,3 @@
-
 pub const CreateWindow = extern struct {
     opcode: u8 = 1,
     depth: u8,
@@ -8,7 +7,7 @@ pub const CreateWindow = extern struct {
     x: i16,
     y: i16,
     width: u16,
-    height: u16 ,
+    height: u16,
     border_width: u16,
     window_class: WindowClass,
     visual_id: u32,
@@ -41,21 +40,21 @@ pub const WindowMask = enum(u32) {
 
 pub const DestroyWindow = extern struct {
     opcode: u8 = 4,
-    pad: u8= 0,
+    pad: u8 = 0,
     length: u16 = @sizeOf(@This()) / 4,
     window_id: u32,
 };
 
 pub const MapWindow = extern struct {
     opcode: u8 = 8,
-    pad: u8= 0,
+    pad: u8 = 0,
     length: u16 = @sizeOf(@This()) / 4,
     window_id: u32,
 };
 
 pub const UnmapWindow = extern struct {
     opcode: u8 = 10,
-    pad: u8= 0,
+    pad: u8 = 0,
     length: u16 = @sizeOf(@This()) / 4,
     window_id: u32,
 };
@@ -101,7 +100,7 @@ pub const PutImage = extern struct {
     opcode: u8 = 72,
     format: ImageFormat = .ZPixmap,
     length: u16 = (@sizeOf(@This()) / 4),
-    drawable_id: u32 ,
+    drawable_id: u32,
     graphic_context_id: u32,
     width: u16,
     height: u16,
@@ -109,7 +108,7 @@ pub const PutImage = extern struct {
     y: i16,
     left_pad: u8 = 0,
     depth: u8,
-    pad: [2]u8 = .{0,0},
+    pad: [2]u8 = .{ 0, 0 },
 };
 
 pub const ImageFormat = enum(u8) {

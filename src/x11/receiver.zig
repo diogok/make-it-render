@@ -27,7 +27,7 @@ pub fn receiveAll(allocator: std.mem.Allocator, reader: anytype) ![]const Messag
     var arr = std.ArrayList(Message).init(allocator);
 
     var message = try receive(allocator, reader);
-    while(message) |msg| {
+    while (message) |msg| {
         try arr.append(msg);
         message = try receive(allocator, reader);
     }

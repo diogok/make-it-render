@@ -28,4 +28,3 @@ pub const XID = struct {
         return self.last | self.base;
     }
 };
-
