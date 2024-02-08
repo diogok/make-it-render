@@ -31,7 +31,7 @@ pub fn main() !void {
 
         .value_mask = @intFromEnum(x11.WindowMask.colormap) | @intFromEnum(x11.WindowMask.back_pixel),
     };
-    const win_values = [_]u32{ info.screens[0].black_pixel, info.screens[0].colormap };
+    const win_values = [_]u32{ info.screens[0].black_pixel, info.screens[0].colormap }; // from smaller mask to bigger
     try x11.sendWithValues(conn, win_req, &win_values);
 
     const map_req = x11.MapWindow{ .window_id = window_id };
@@ -54,14 +54,15 @@ pub fn main() !void {
     var byte_index: usize = 0;
     while (byte_index < yellow_block.len) {
         yellow_block[byte_index] = 255; // red
-        yellow_block[byte_index + 1] = 255; // green
+        yellow_block[byte_index + 1] = 150; // green
         yellow_block[byte_index + 2] = 0; // blue
-        yellow_block[byte_index + 3] = 0; // padding or alpha, ignored for now
+        yellow_block[byte_index + 3] = 0; // padding
 
         byte_index += 4;
     }
 
     const yellow_block_zpixmap = try x11.rgbaToZPixmapAlloc(allocator, info, win_req.parent_id, &yellow_block);
+    defer allocator.free(yellow_block_zpixmap);
 
     const put_image_req = x11.PutImage{
         .drawable_id = pixmap_id,

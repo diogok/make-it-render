@@ -1,7 +1,7 @@
 const std = @import("std");
 const xsetup = @import("setup.zig");
 
-pub fn rgbaToZPixmapAlloc(_: std.mem.Allocator, info: xsetup.Setup, root: u32, rgba: []const u8) ![]const u8 {
+pub fn rgbaToZPixmapAlloc(allocator: std.mem.Allocator, info: xsetup.Setup, root: u32, rgba: []const u8) ![]const u8 {
     const target_depth = info.screens[0].root_depth;
 
     var format_index: usize = 0;
@@ -40,5 +40,34 @@ pub fn rgbaToZPixmapAlloc(_: std.mem.Allocator, info: xsetup.Setup, root: u32, r
     std.debug.print("Format: {any}\n", .{format});
     std.debug.print("VisualType: {any}\n", .{visual_type});
 
-    return rgba;
+    if (visual_type.class != .TrueColor) {
+        return error.UnsupportedVisualTypeClass;
+    }
+    if (format.bits_per_pixel != 32) {
+        return error.UnsupportedBitsPerPixel;
+    }
+    if (format.bits_per_pixel != format.scanline_pad) {
+        return error.UnsupportedScanlinePad;
+    }
+
+    // TODO: lot of assumptions here
+    const pixels = try allocator.alloc(u8, rgba.len);
+    for (0..(rgba.len / 4)) |i| {
+        const red = (rgba[i * 4] | visual_type.red_mask);
+        const green = (rgba[i * 4 + 1] | visual_type.green_mask);
+        const blue = (rgba[i * 4 + 2] | visual_type.blue_mask);
+
+        const pixel: u32 = red | green | blue;
+
+        var buffer: [4]u8 = undefined;
+        std.mem.writeInt(u32, &buffer, pixel, .big);
+
+        pixels[i * 4] = buffer[0];
+        pixels[i * 4 + 1] = buffer[1];
+        pixels[i * 4 + 2] = buffer[2];
+        pixels[i * 4 + 3] = buffer[3];
+    }
+
+    std.debug.print("Pixels: {any}\n", .{pixels[0..4]});
+    return pixels;
 }

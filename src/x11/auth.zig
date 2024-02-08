@@ -1,12 +1,9 @@
 const std = @import("std");
-const endian = @import("builtin").cpu.arch.endian();
 
 fn open_xauth_file() !std.fs.File {
     if (std.os.getenv("XAUTHORITY")) |file| {
-        std.debug.print("Xauthority file: {s}\n", .{file});
         return std.fs.openFileAbsolute(file, .{});
     } else if (std.os.getenv("HOME")) |home| {
-        std.debug.print("Xauthority file: {s}/.Xauthority\n", .{home});
         var dir = try std.fs.openDirAbsolute(home, .{});
         defer dir.close();
         return dir.openFile(".Xauthority", .{});
@@ -36,9 +33,6 @@ fn read_xauth_file(allocator: std.mem.Allocator, xauth_file: std.fs.File) !XAuth
     const xauth_data = try allocator.alloc(u8, xauth_data_len);
     errdefer allocator.free(xauth_data);
     _ = try xauth_reader.read(xauth_data); // read data
-
-    std.debug.print("Auth name: {s}\n", .{xauth_name});
-    std.debug.print("Auth data size: {d}\n", .{xauth_data.len});
 
     if (!std.mem.eql(u8, xauth_name, "MIT-MAGIC-COOKIE-1")) {
         return error.UnsupportedAuth;
