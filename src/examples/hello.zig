@@ -61,7 +61,7 @@ pub fn main() !void {
         byte_index += 4;
     }
 
-    const yellow_block_zpixmap = try x11.rgbaToZPixmapAlloc(allocator, info, &yellow_block);
+    const yellow_block_zpixmap = try x11.rgbaToZPixmapAlloc(allocator, info, win_req.parent_id, &yellow_block);
 
     const put_image_req = x11.PutImage{
         .drawable_id = pixmap_id,

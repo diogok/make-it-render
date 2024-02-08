@@ -1,7 +1,7 @@
 const std = @import("std");
 const xsetup = @import("setup.zig");
 
-pub fn rgbaToZPixmapAlloc(_: std.mem.Allocator, info: xsetup.Setup, rgba: []const u8) ![]const u8 {
+pub fn rgbaToZPixmapAlloc(_: std.mem.Allocator, info: xsetup.Setup, root: u32, rgba: []const u8) ![]const u8 {
     const target_depth = info.screens[0].root_depth;
 
     var format_index: usize = 0;
@@ -11,18 +11,24 @@ pub fn rgbaToZPixmapAlloc(_: std.mem.Allocator, info: xsetup.Setup, rgba: []cons
         }
     }
     const format = info.formats[format_index];
-    std.debug.print("Format: {any}\n", .{format});
+
+    var screen_index: usize = 0;
+    for (info.screens, 0..) |iscreen, index| {
+        if (iscreen.root == root) {
+            screen_index = index;
+        }
+    }
+    const screen = info.screens[screen_index];
 
     var depth_index: usize = 0;
-    for (info.screens[0].allowed_depths, 0..) |idepth, index| {
+    for (screen.allowed_depths, 0..) |idepth, index| {
         if (idepth.depth == target_depth) {
             depth_index = index;
         }
     }
-    const allowed_depth = info.screens[0].allowed_depths[depth_index];
-    const depth = allowed_depth.depth;
+    const allowed_depth = screen.allowed_depths[depth_index];
 
-    const target_visual_id = info.screens[0].root_visual;
+    const target_visual_id = screen.root_visual;
     var visual_type_index: usize = 0;
     for (allowed_depth.visual_types, 0..) |ivisual_type, index| {
         if (ivisual_type.visual_id == target_visual_id) {
@@ -30,6 +36,8 @@ pub fn rgbaToZPixmapAlloc(_: std.mem.Allocator, info: xsetup.Setup, rgba: []cons
         }
     }
     const visual_type = allowed_depth.visual_types[visual_type_index];
+
+    std.debug.print("Format: {any}\n", .{format});
     std.debug.print("VisualType: {any}\n", .{visual_type});
 
     return rgba;
