@@ -1,47 +1,47 @@
+pub const Instance = *anyopaque;
+pub const Icon = *anyopaque;
+pub const Cursor = *anyopaque;
+pub const Brush = *anyopaque;
+pub const Menu = *anyopaque;
+pub const WindowHandle = *anyopaque;
 
-pub const Instance = *anyopaque{};
-pub const Icon = *anyopaque{};
-pub const Cursor = *anyopaque{};
-pub const Brush = *anyopaque{};
-pub const Menu = *anyopaque{};
-pub const WindowHandle = *anyopaque{};
+//const W = std.unicode.utf8ToUtf16LeStringLiteral;
 
 pub extern "kernel32" fn GetModuleHandleW(module_name: ?[*:0]const u16) callconv(.C) ?Instance;
 
-
 pub const WindowClass = extern struct {
-    cbSize: u32=@sizeOf(@This()),
-    style: u32=0,
-    lpfnWndProc: ?WindowProcedure,
-    cbClsExtra: i32=0,
-    cbWndExtra: i32=0,
-    hInstance: ?Instance,
-    hIcon: ?Icon=null,
-    hCursor: ?Cursor=null,
-    hbrBackground: ?Brush=null,
-    lpszMenuName: ?[*:0]const u16=null,
-    lpszClassName: ?[*:0]const u16,
-    hIconSm: ?Icon=null,
+    size: u32 = @sizeOf(@This()),
+    style: u32 = 0,
+    window_procedure: ?WindowProcedure,
+    class_extra: i32 = 0,
+    window_extra: i32 = 0,
+    instance: ?Instance,
+    icon: ?Icon = null,
+    cursor: ?Cursor = null,
+    background: ?Brush = null,
+    menu_name: ?[*:0]const u16 = null,
+    class_name: ?[*:0]const u16,
+    icon_small: ?Icon = null,
 };
 
-pub extern "kernel32" fn GetLastError() callconv(.C) u32;// TODO: error enum? Might be too big.
+pub extern "kernel32" fn GetLastError() callconv(.C) u32; // TODO: error enum? Might be too big.
 
 pub extern "user32" fn RegisterClassExW(window_class: ?*const WindowClass) callconv(.C) u16;
 
-const UseDefault = @as(i32, -2147483648);
+pub const UseDefault = @as(i32, -2147483648);
 pub extern "user32" fn CreateWindowExW(
     ex_style: ExStyle,
     class_name: ?[*:0]const u16,
     window_name: ?[*:0]const u16,
     style: Style,
-    X: i32=UseDefault, 
-    Y: i32=UseDefault,
-    width: i32=UseDefault,
-    height: i32=UseDefault,
-    parent: ?WindowHandle=null,
-    menu: ?Menu=null,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    parent: ?WindowHandle,
+    menu: ?Menu,
     instance: ?Instance,
-    lpParam: ?*anyopaque=null,
+    lpParam: ?*anyopaque,
 ) callconv(@import("std").os.windows.WINAPI) ?WindowHandle;
 
 pub extern "user32" fn ShowWindow(window_handle: ?WindowHandle, display: u32) callconv(.C) ?WindowHandle;
@@ -62,6 +62,7 @@ pub const Point = extern struct {
 
 pub const MessageType = enum(u32) {
     WM_DESTROY = 2,
+    _,
 };
 
 pub extern "user32" fn GetMessageW(message: ?*Message, window_handle: ?WindowHandle, filter_min: u32, filter_max: u32) callconv(.C) i32;
@@ -130,7 +131,6 @@ pub const Style = enum(u32) {
     ACTIVECAPTION = 1,
 };
 
-
 pub const ClassStyle = enum(u32) {
     VREDRAW = 1,
     HREDRAW = 2,
@@ -147,25 +147,24 @@ pub const ClassStyle = enum(u32) {
     DROPSHADOW = 131072,
 };
 
-
 pub const WindowProcedure = switch (@import("builtin").zig_backend) {
-    .stage1 => fn(
-        param0: WindowHandle,
-        param1: u32,
-        param2: usize,
-        param3: isize,
+    .stage1 => fn (
+        window_handle: WindowHandle,
+        message_type: MessageType,
+        wParam: usize,
+        lParam: isize,
     ) callconv(.C) isize,
-    else => *const fn(
-        param0: WindowHandle,
-        param1: u32,
-        param2: usize,
-        param3: isize,
+    else => *const fn (
+        window_handle: WindowHandle,
+        message_type: MessageType,
+        wParam: usize,
+        lParam: isize,
     ) callconv(.C) isize,
-} ;
+};
 
 pub extern "user32" fn DefWindowProcW(
-    hWnd: ?WindowHandle,
-    Msg: u32,
+    window_handle: WindowHandle,
+    message_type: MessageType,
     wParam: usize,
     lParam: isize,
 ) callconv(.C) isize;

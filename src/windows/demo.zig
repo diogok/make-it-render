@@ -1,91 +1,86 @@
 const std = @import("std");
-const win = @import("std").os.windows;
-const c = @import("c.zig");
+const win = @import("windows.zig");
 
 pub fn main() !void {
-    const hInstance = c.GetModuleHandleW(null);
-    std.debug.print("Called main {any} {any}\n", .{ std.builtin.subsystem, hInstance });
+    const instance = win.GetModuleHandleW(null);
+    std.debug.print("Called main {any} {any}\n", .{ std.builtin.subsystem, instance });
 
-    const class_name = &[_:0]c_ushort{'H','e','l','l','o'};
+    const class_name = &[_:0]c_ushort{ 'H', 'e', 'l', 'l', 'o' };
 
-    var window_class: c.WNDCLASSEXW = .{
-        .cbSize = @sizeOf(c.WNDCLASSEXW),
-        .style = @intFromEnum(c.CS_HREDRAW) | @intFromEnum(c.CS_VREDRAW),
+    var window_class: win.WindowClass = .{
+        .style = @intFromEnum(win.ClassStyle.HREDRAW) | @intFromEnum(win.ClassStyle.VREDRAW),
         //.hbrBackground = @as(c.HBRUSH,c.GetStockObject(c.WHITE_BRUSH)),
-        .lpfnWndProc = windowProc,
-        .hInstance = hInstance,
-        .lpszClassName = class_name,
+        .window_procedure = windowProc,
+        .instance = instance,
+        .class_name = class_name,
     };
 
-    const registered_window = c.RegisterClassExW(&window_class);
-    if(registered_window == 0) {
-        const err = c.GetLastError();
-        std.debug.print("Register error: {any}\n",.{err});
+    const registered_window = win.RegisterClassExW(&window_class);
+    if (registered_window == 0) {
+        const err = win.GetLastError();
+        std.debug.print("Register error: {d}\n", .{err});
         return error.RegisterClassError;
     }
 
-    const window_handle = c.CreateWindowExW(
-        c.WS_EX_OVERLAPPEDWINDOW,
+    const window_handle = win.CreateWindowExW(
+        win.ExStyle.OVERLAPPEDWINDOW,
         class_name,
         class_name,
-        c.WS_OVERLAPPEDWINDOW,
-        10, 
-        10, 
-        480, 
-        240,
+        win.Style.OVERLAPPED,
+        win.UseDefault, // x
+        win.UseDefault, // y
+        win.UseDefault, // width
+        win.UseDefault, // height
         null,
         null,
-        hInstance,
+        instance,
         null,
-        );
-    if(window_handle == null) {
-        const err = c.GetLastError();
-        std.debug.print("Create window error: {any}\n",.{err});
+    );
+    if (window_handle == null) {
+        const err = win.GetLastError();
+        std.debug.print("Create window error: {any}\n", .{err});
         return error.CreateWindowError;
     }
 
-    const show_result = c.ShowWindow(window_handle,10);
-    if(show_result != null) {
-        const err = c.GetLastError();
-        std.debug.print("ShowWindow error: {any}\n",.{err});
+    const show_result = win.ShowWindow(window_handle, 10);
+    if (show_result != null) {
+        const err = win.GetLastError();
+        std.debug.print("ShowWindow error: {any}\n", .{err});
         return error.ShowWindowError;
     }
 
     //result = c.UpdateWindow(window_handle);
     //if(result != 0) {
-     //   const err = c.GetLastError();
-      //  std.debug.print("UpdateWindow error: {any}\n",.{err});
-       // return error.UpdateWindowError;
+    //  const err = win.GetLastError();
+    //  std.debug.print("UpdateWindow error: {any}\n",.{err});
+    // return error.UpdateWindowError;
     //}
 
-    var msg:c.MSG = undefined;
-    while(c.GetMessageW(&msg,null,0,0) > 0) {
-        const translate_result = c.TranslateMessage(&msg);
-        if(translate_result != 0) {
-            const err = c.GetLastError();
-            std.debug.print("TranslateMessageW error: {any}\n",.{err});
+    var msg: win.Message = undefined;
+    while (win.GetMessageW(&msg, null, 0, 0) > 0) {
+        const translate_result = win.TranslateMessage(&msg);
+        if (translate_result != 0) {
+            const err = win.GetLastError();
+            std.debug.print("TranslateMessageW error: {any}\n", .{err});
             return error.TranslateMessageW;
         }
-        const dispatch_result = c.DispatchMessageW(&msg);
-       if(dispatch_result != 0) {
-            const err = c.GetLastError();
-            std.debug.print("DispatchMessageW error: {any}\n",.{err});
+        const dispatch_result = win.DispatchMessageW(&msg);
+        if (dispatch_result != 0) {
+            const err = win.GetLastError();
+            std.debug.print("DispatchMessageW error: {any}\n", .{err});
             return error.DispatchMessageW;
         }
     }
 }
 
-pub fn windowProc(window_handle: c.HWND, message_type: c_uint, wparam: c.WPARAM, lparam: c.LPARAM) callconv(.C) c.LRESULT {
-    switch(message_type) {
-        c.WM_DESTROY => {
-            c.PostQuitMessage(0);
+pub fn windowProc(window_handle: win.WindowHandle, message_type: win.MessageType, wparam: usize, lparam: isize) callconv(.C) isize {
+    switch (message_type) {
+        .WM_DESTROY => {
+            win.PostQuitMessage(0);
             return 0;
-        }, 
+        },
         else => {
-            return c.DefWindowProcW(window_handle, message_type, wparam, lparam);
-        }
+            return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
+        },
     }
 }
-
-var called: bool=false;
-//const W = std.unicode.utf8ToUtf16LeStringLiteral;
