@@ -10,7 +10,7 @@ pub fn main() !void {
 
     var window_class: c.WNDCLASSEXW = .{
         .cbSize = @sizeOf(c.WNDCLASSEXW),
-        .style = c.CS_HREDRAW | c.CS_VREDRAW,
+        .style = @intFromEnum(c.CS_HREDRAW) | @intFromEnum(c.CS_VREDRAW),
         //.hbrBackground = @as(c.HBRUSH,c.GetStockObject(c.WHITE_BRUSH)),
         .lpfnWndProc = windowProc,
         .hInstance = hInstance,
@@ -44,12 +44,13 @@ pub fn main() !void {
         return error.CreateWindowError;
     }
 
-    var result = c.ShowWindow(window_handle,10);
-    if(result != 0) {
+    const show_result = c.ShowWindow(window_handle,10);
+    if(show_result != null) {
         const err = c.GetLastError();
         std.debug.print("ShowWindow error: {any}\n",.{err});
         return error.ShowWindowError;
     }
+
     //result = c.UpdateWindow(window_handle);
     //if(result != 0) {
      //   const err = c.GetLastError();
@@ -59,14 +60,14 @@ pub fn main() !void {
 
     var msg:c.MSG = undefined;
     while(c.GetMessageW(&msg,null,0,0) > 0) {
-        result = c.TranslateMessage(&msg);
-        if(result != 0) {
+        const translate_result = c.TranslateMessage(&msg);
+        if(translate_result != 0) {
             const err = c.GetLastError();
             std.debug.print("TranslateMessageW error: {any}\n",.{err});
             return error.TranslateMessageW;
         }
-        const dresult = c.DispatchMessageW(&msg);
-        if(dresult != 0) {
+        const dispatch_result = c.DispatchMessageW(&msg);
+       if(dispatch_result != 0) {
             const err = c.GetLastError();
             std.debug.print("DispatchMessageW error: {any}\n",.{err});
             return error.DispatchMessageW;
@@ -83,7 +84,7 @@ pub fn windowProc(window_handle: c.HWND, message_type: c_uint, wparam: c.WPARAM,
         else => {
             return c.DefWindowProcW(window_handle, message_type, wparam, lparam);
         }
-    }    
+    }
 }
 
 var called: bool=false;
