@@ -6,7 +6,7 @@ pub fn main() !void {
     const hInstance = c.GetModuleHandleW(null);
     std.debug.print("Called main {any} {any}\n", .{ std.builtin.subsystem, hInstance });
 
-    const class_name: [*c]const c_ushort = &[_]c_ushort{'H','e','l','l','o'};
+    const class_name = &[_:0]c_ushort{'H','e','l','l','o'};
 
     var window_class: c.WNDCLASSEXW = .{
         .cbSize = @sizeOf(c.WNDCLASSEXW),
