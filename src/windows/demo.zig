@@ -49,13 +49,6 @@ pub fn main() !void {
         return error.ShowWindowError;
     }
 
-    //result = c.UpdateWindow(window_handle);
-    //if(result != 0) {
-    //  const err = win.GetLastError();
-    //  std.debug.print("UpdateWindow error: {any}\n",.{err});
-    // return error.UpdateWindowError;
-    //}
-
     var msg: win.Message = undefined;
     while (win.GetMessageW(&msg, null, 0, 0) > 0) {
         const translate_result = win.TranslateMessage(&msg);

@@ -1,0 +1,49 @@
+
+all: linux windows
+
+clean:
+	rm -rf zig-out zig-cache target
+
+linux: x86_64-linux x86-linux aarch64-linux
+
+x86_64-linux:
+	zig build install -Dtarget=x86_64-linux-gnu
+	mkdir -p target
+	mv zig-out/bin/demo-x11 target/demo-x11-x86_64-linux-gnu
+	ls -lah target/demo-x11-x86_64-linux-gnu
+
+x86-linux:
+	zig build -Dtarget=x86_64-linux-gnu
+	mkdir -p target
+	mv zig-out/bin/demo-x11 target/demo-x11-x86-linux-gnu
+	ls -lah target/demo-x11-x86_64-linux-gnu
+
+aarch64-linux:
+	zig build -Dtarget=aarch64-linux-gnu
+	mkdir -p target
+	mv zig-out/bin/demo-x11 target/demo-x11-aarch64-linux-gnu
+	ls -lah target/demo-x11-aarch64-linux-gnu
+
+run-windows: 
+	zig build install -Dtarget=x86_64-windows-gnu
+	wine zig-out/bin/demo-windows.exe
+
+windows: x86_64-windows x86-windows aarch64-windows
+
+x86_64-windows:
+	zig build install -Dtarget=x86_64-windows-gnu
+	mkdir -p target
+	mv zig-out/bin/demo-windows.exe target/demo-windows-x86_64.exe
+	ls -lah target/demo-windows-x86_64.exe
+
+x86-windows:\
+	#zig build -Dtarget=x86-windows-gnu -Doptimize=ReleaseSmall
+	#mkdir -p target
+	#mv zig-out/bin/demo-windows.exe target/demo-windows-x86.exe
+	#ls -lah target/demo-windows-x86.exe
+
+aarch64-windows:
+	zig build install -Dtarget=aarch64-windows-gnu
+	mkdir -p target
+	mv zig-out/bin/demo-windows.exe target/demo-windows-aarch64.exe
+	ls -lah target/demo-windows-aarch64.exe

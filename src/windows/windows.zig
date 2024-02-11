@@ -24,7 +24,7 @@ pub const WindowClass = extern struct {
     icon_small: ?Icon = null,
 };
 
-pub extern "kernel32" fn GetLastError() callconv(.C) u32; // TODO: error enum? Might be too big.
+pub extern "kernel32" fn GetLastError() callconv(.C) u32;
 
 pub extern "user32" fn RegisterClassExW(window_class: ?*const WindowClass) callconv(.C) u16;
 
@@ -42,7 +42,7 @@ pub extern "user32" fn CreateWindowExW(
     menu: ?Menu,
     instance: ?Instance,
     lpParam: ?*anyopaque,
-) callconv(@import("std").os.windows.WINAPI) ?WindowHandle;
+) callconv(.C) ?WindowHandle;
 
 pub extern "user32" fn ShowWindow(window_handle: ?WindowHandle, display: u32) callconv(.C) ?WindowHandle;
 
