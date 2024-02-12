@@ -4,7 +4,7 @@ all: linux windows
 clean:
 	rm -rf zig-out zig-cache target
 
-linux: x86_64-linux x86-linux aarch64-linux
+linux: x86_64-linux x86-linux aarch64-linux arm-linux riscv64-linux
 
 x86_64-linux:
 	zig build install -Dtarget=x86_64-linux-gnu
@@ -13,7 +13,7 @@ x86_64-linux:
 	ls -lah target/demo-x11-x86_64-linux-gnu
 
 x86-linux:
-	zig build -Dtarget=x86_64-linux-gnu
+	zig build -Dtarget=x86-linux-gnu
 	mkdir -p target
 	mv zig-out/bin/demo-x11 target/demo-x11-x86-linux-gnu
 	ls -lah target/demo-x11-x86_64-linux-gnu
@@ -23,6 +23,18 @@ aarch64-linux:
 	mkdir -p target
 	mv zig-out/bin/demo-x11 target/demo-x11-aarch64-linux-gnu
 	ls -lah target/demo-x11-aarch64-linux-gnu
+
+arm-linux:
+	zig build -Dtarget=arm-linux-gnu
+	mkdir -p target
+	mv zig-out/bin/demo-x11 target/demo-x11-arm-linux-gnu
+	ls -lah target/demo-x11-arm-linux-gnu
+
+riscv64-linux:
+	zig build -Dtarget=riscv64-linux-gnu
+	mkdir -p target
+	mv zig-out/bin/demo-x11 target/demo-x11-riscv64-linux-gnu
+	ls -lah target/demo-x11-riscv64-linux-gnu
 
 run-windows: 
 	zig build install -Dtarget=x86_64-windows-gnu
@@ -36,7 +48,8 @@ x86_64-windows:
 	mv zig-out/bin/demo-windows.exe target/demo-windows-x86_64.exe
 	ls -lah target/demo-windows-x86_64.exe
 
-x86-windows:\
+x86-windows:
+	# TODO: Not working
 	#zig build -Dtarget=x86-windows-gnu -Doptimize=ReleaseSmall
 	#mkdir -p target
 	#mv zig-out/bin/demo-windows.exe target/demo-windows-x86.exe

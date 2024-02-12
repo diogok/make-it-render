@@ -5,9 +5,10 @@ pub const Brush = *anyopaque;
 pub const Menu = *anyopaque;
 pub const WindowHandle = *anyopaque;
 
-//const W = std.unicode.utf8ToUtf16LeStringLiteral;
+pub const W =  @import("std").unicode.utf8ToUtf16LeWithNull;
 
 pub extern "kernel32" fn GetModuleHandleW(module_name: ?[*:0]const u16) callconv(.C) ?Instance;
+pub extern "kernel32" fn GetModuleHandleExW(flags: u32, module_name: ?[*:0]const u16, module: ?*?Instance) callconv(.C) ?Instance;
 
 pub const WindowClass = extern struct {
     size: u32 = @sizeOf(@This()),
@@ -30,10 +31,10 @@ pub extern "user32" fn RegisterClassExW(window_class: ?*const WindowClass) callc
 
 pub const UseDefault = @as(i32, -2147483648);
 pub extern "user32" fn CreateWindowExW(
-    ex_style: ExStyle,
+    ex_style: ExtendedWindowStyle,
     class_name: ?[*:0]const u16,
     window_name: ?[*:0]const u16,
-    style: Style,
+    style: WindowStyle,
     x: i32,
     y: i32,
     width: i32,
@@ -70,65 +71,23 @@ pub extern "user32" fn TranslateMessage(message: ?*const Message) callconv(.C) c
 pub extern "user32" fn DispatchMessageW(lpMsg: ?*const Message) callconv(.C) isize;
 pub extern "user32" fn PostQuitMessage(val: i32) callconv(.C) void;
 
-pub const ExStyle = enum(u32) {
-    DLGMODALFRAME = 1,
-    NOPARENTNOTIFY = 4,
-    TOPMOST = 8,
-    ACCEPTFILES = 16,
-    TRANSPARENT = 32,
-    MDICHILD = 64,
-    TOOLWINDOW = 128,
-    WINDOWEDGE = 256,
-    CLIENTEDGE = 512,
-    CONTEXTHELP = 1024,
-    RIGHT = 4096,
-    LEFT = 0,
-    RTLREADING = 8192,
-    // LTRREADING = 0, this enum value conflicts with LEFT
-    LEFTSCROLLBAR = 16384,
-    // RIGHTSCROLLBAR = 0, this enum value conflicts with LEFT
-    CONTROLPARENT = 65536,
-    STATICEDGE = 131072,
-    APPWINDOW = 262144,
-    OVERLAPPEDWINDOW = 768,
-    PALETTEWINDOW = 392,
-    LAYERED = 524288,
-    NOINHERITLAYOUT = 1048576,
-    NOREDIRECTIONBITMAP = 2097152,
-    LAYOUTRTL = 4194304,
-    COMPOSITED = 33554432,
-    NOACTIVATE = 134217728,
+pub const ExtendedWindowStyle = enum(u32) {
+    OverlappedWindow = 0x00000300,
+    ClientEdge = 0x00000200,
+    WindowEdge = 0x00000100,
 };
 
-pub const Style = enum(u32) {
-    OVERLAPPED = 0,
-    POPUP = 2147483648,
-    CHILD = 1073741824,
-    MINIMIZE = 536870912,
-    VISIBLE = 268435456,
-    DISABLED = 134217728,
-    CLIPSIBLINGS = 67108864,
-    CLIPCHILDREN = 33554432,
-    MAXIMIZE = 16777216,
-    CAPTION = 12582912,
-    BORDER = 8388608,
-    DLGFRAME = 4194304,
-    VSCROLL = 2097152,
-    HSCROLL = 1048576,
-    SYSMENU = 524288,
-    THICKFRAME = 262144,
-    GROUP = 131072,
-    TABSTOP = 65536,
-    // MINIMIZEBOX = 131072, this enum value conflicts with GROUP
-    // MAXIMIZEBOX = 65536, this enum value conflicts with TABSTOP
-    // TILED = 0, this enum value conflicts with OVERLAPPED
-    // ICONIC = 536870912, this enum value conflicts with MINIMIZE
-    // SIZEBOX = 262144, this enum value conflicts with THICKFRAME
-    TILEDWINDOW = 13565952,
-    // OVERLAPPEDWINDOW = 13565952, this enum value conflicts with TILEDWINDOW
-    POPUPWINDOW = 2156396544,
-    // CHILDWINDOW = 1073741824, this enum value conflicts with CHILD
-    ACTIVECAPTION = 1,
+pub const WindowStyle = enum(u32) {
+    Border   =    0x00800000,
+    Caption  =    0x00C00000,
+    Maximize   =  0x01000000,
+    MaximizeBox = 0x00010000,
+    Minimize    = 0x20000000,
+    MinimizeBox = 0x00020000,
+    SysMenu  =    0x00080000,
+    ThickFrame =  0x00040000,
+    OverlappedWindow = 0x00CF0000,
+    Overlapped = 0x00000000,
 };
 
 pub const ClassStyle = enum(u32) {

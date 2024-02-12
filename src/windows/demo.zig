@@ -1,11 +1,19 @@
 const std = @import("std");
 const win = @import("windows.zig");
 
-pub fn main() !void {
-    const instance = win.GetModuleHandleW(null);
-    std.debug.print("Called main {any} {any}\n", .{ std.builtin.subsystem, instance });
+const log = std.log.scoped(.main);
 
-    const class_name = &[_:0]c_ushort{ 'H', 'e', 'l', 'l', 'o' };
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer std.debug.assert(gpa.deinit() != .leak);
+    const allocator = gpa.allocator();
+
+    //const instance = win.GetModuleHandleW(null);
+    const instance = win.GetModuleHandleExW(0,null,null);
+    log.debug("Called main {any} {any}", .{ std.builtin.subsystem, instance });
+
+    const class_name = try win.W(allocator, "HelloClass");
+    defer allocator.free(class_name);
 
     var window_class: win.WindowClass = .{
         .style = @intFromEnum(win.ClassStyle.HREDRAW) | @intFromEnum(win.ClassStyle.VREDRAW),
@@ -15,18 +23,13 @@ pub fn main() !void {
         .class_name = class_name,
     };
 
-    const registered_window = win.RegisterClassExW(&window_class);
-    if (registered_window == 0) {
-        const err = win.GetLastError();
-        std.debug.print("Register error: {d}\n", .{err});
-        return error.RegisterClassError;
-    }
+    _ = win.RegisterClassExW(&window_class);
 
     const window_handle = win.CreateWindowExW(
-        win.ExStyle.OVERLAPPEDWINDOW,
+        win.ExtendedWindowStyle.OverlappedWindow,
         class_name,
         class_name,
-        win.Style.OVERLAPPED,
+        win.WindowStyle.OverlappedWindow,
         win.UseDefault, // x
         win.UseDefault, // y
         win.UseDefault, // width
@@ -38,31 +41,21 @@ pub fn main() !void {
     );
     if (window_handle == null) {
         const err = win.GetLastError();
-        std.debug.print("Create window error: {any}\n", .{err});
+        log.err("Create window error: {any}", .{err});
         return error.CreateWindowError;
     }
 
     const show_result = win.ShowWindow(window_handle, 10);
     if (show_result != null) {
         const err = win.GetLastError();
-        std.debug.print("ShowWindow error: {any}\n", .{err});
+        log.err("ShowWindow error: {any}", .{err});
         return error.ShowWindowError;
     }
 
     var msg: win.Message = undefined;
     while (win.GetMessageW(&msg, null, 0, 0) > 0) {
-        const translate_result = win.TranslateMessage(&msg);
-        if (translate_result != 0) {
-            const err = win.GetLastError();
-            std.debug.print("TranslateMessageW error: {any}\n", .{err});
-            return error.TranslateMessageW;
-        }
-        const dispatch_result = win.DispatchMessageW(&msg);
-        if (dispatch_result != 0) {
-            const err = win.GetLastError();
-            std.debug.print("DispatchMessageW error: {any}\n", .{err});
-            return error.DispatchMessageW;
-        }
+        _ = win.TranslateMessage(&msg);
+        _ = win.DispatchMessageW(&msg);
     }
 }
 

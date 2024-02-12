@@ -12,7 +12,6 @@ pub fn build(b: *std.Build) !void {
             .optimize = optimize,
             .root_source_file = .{ .path = "demo.zig" },
         });
-        exe.subsystem = .Windows;
 
         //exe.root_module.addImport("win32", win32);
 
