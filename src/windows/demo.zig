@@ -8,10 +8,10 @@ pub fn main() !void {
     defer std.debug.assert(gpa.deinit() != .leak);
     const allocator = gpa.allocator();
 
-    //const instance = win.GetModuleHandleW(null);
     const instance = win.GetModuleHandleExW(0,null,null);
     log.debug("Called main {any} {any}", .{ std.builtin.subsystem, instance });
 
+    //const class_name = try win.W2("HelloClass"); // For string literals, comptime known
     const class_name = try win.W(allocator, "HelloClass");
     defer allocator.free(class_name);
 

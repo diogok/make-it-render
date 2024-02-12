@@ -6,9 +6,10 @@ pub const Menu = *anyopaque;
 pub const WindowHandle = *anyopaque;
 
 pub const W =  @import("std").unicode.utf8ToUtf16LeWithNull;
+pub const W2 =  @import("std").unicode.utf8ToUtf16LeStringLiteral;
 
-pub extern "kernel32" fn GetModuleHandleW(module_name: ?[*:0]const u16) callconv(.C) ?Instance;
 pub extern "kernel32" fn GetModuleHandleExW(flags: u32, module_name: ?[*:0]const u16, module: ?*?Instance) callconv(.C) ?Instance;
+pub extern "kernel32" fn GetLastError() callconv(.C) u32;
 
 pub const WindowClass = extern struct {
     size: u32 = @sizeOf(@This()),
@@ -25,7 +26,6 @@ pub const WindowClass = extern struct {
     icon_small: ?Icon = null,
 };
 
-pub extern "kernel32" fn GetLastError() callconv(.C) u32;
 
 pub extern "user32" fn RegisterClassExW(window_class: ?*const WindowClass) callconv(.C) u16;
 
