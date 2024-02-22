@@ -5,6 +5,7 @@ pub const Class = ID;
 pub const Selector = ID;
 pub const Protocol = ID;
 
+const MsgSend = *const fn (class: ?*Class, sel: ?*Selector) callconv(.C) ?*ID;
 const GetClass = *const fn (name: [*c]const u8) callconv(.C) ?*Class;
 const RegisterName = *const fn (name: [*c]const u8) callconv(.C) ?*Selector;
 
@@ -16,26 +17,11 @@ const AddProtocol = *const fn (?*Class, ?*Protocol) callconv(.C) bool;
 
 const Implementation = *const fn (id: ?*ID, selector: ?*Selector, window: ?*ID) callconv(.C) bool;
 
-pub const Rect = extern struct {
-    x: f64,
-    y: f64,
-    w: f64,
-    h: f64,
-};
-
-const MsgSend = *const fn (class: ?*Class, sel: ?*Selector) callconv(.C) ?*ID;
-
 pub const load = Fns.init;
 
 const Fns = struct {
     getClass: GetClass,
     registerName: RegisterName,
-
-    allocateClassPair: AllocateClassPair,
-    registerClassPair: RegisterClassPair,
-    addMethod: AddMethod,
-    getProtocol: GetProtocol,
-    addProtocol: AddProtocol,
 
     msgSend: MsgSend,
 
@@ -49,6 +35,12 @@ const Fns = struct {
 
     msgSend_WindowInit_ID: *const fn (class: ?*Class, sel: ?*Selector, rect: Rect, style_mask: c_uint, backing_store: c_uint, _defer: bool) callconv(.C) ?*ID,
 
+    allocateClassPair: AllocateClassPair,
+    registerClassPair: RegisterClassPair,
+    addMethod: AddMethod,
+    getProtocol: GetProtocol,
+    addProtocol: AddProtocol,
+
     objc: std.DynLib,
     appkit: std.DynLib,
     foundation: std.DynLib,
@@ -61,6 +53,7 @@ const Fns = struct {
         const coreFoundation = try std.DynLib.open("/System/Library/Frameworks/CoreFoundation.framework/Resources/BridgeSupport/CoreFoundation.dylib");
 
         const msgSend = objc.lookup(MsgSend, "objc_msgSend") orelse return error.MsgSendFnNotFound;
+
         return .{
             .objc = objc,
             .appkit = appkit,
@@ -115,4 +108,11 @@ pub const WindowStyleMask = enum(c_uint) {
 
 pub const BackingStoreType = enum(c_uint) {
     Buffered = 2,
+};
+
+pub const Rect = extern struct {
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 };
