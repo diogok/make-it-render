@@ -7,14 +7,13 @@ pub fn build(b: *std.Build) !void {
     const x11 = b.addModule("x11", .{ .root_source_file = .{ .path = "core.zig" } });
 
     {
-        //const name = bin_name("demo-x11", b, target, optimize);
+        //const filename = bin_name("demo-x11", b, target, optimize);
         const exe = b.addExecutable(.{
-            .name = "demo-x11",
+            .name = "demo",
             .target = target,
             .optimize = optimize,
             .root_source_file = .{ .path = "demo.zig" },
         });
-
         exe.root_module.addImport("x11", x11);
 
         b.installArtifact(exe);

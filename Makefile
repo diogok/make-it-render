@@ -1,5 +1,5 @@
 
-all: linux windows
+all: linux windows macos
 
 clean:
 	rm -rf zig-out zig-cache target
@@ -60,3 +60,23 @@ aarch64-windows:
 	mkdir -p target
 	mv zig-out/bin/demo-windows.exe target/demo-windows-aarch64.exe
 	ls -lah target/demo-windows-aarch64.exe
+
+macosx: x86_64-macosx aarch64-macosx
+
+x86_64-macosx:
+	zig build install -Dtarget=x86_64-macos.10.15-none
+	mkdir -p target
+	mv zig-out/bin/demo target/demo-macos-x86_64
+	shasum target/demo-macos-x86_64 > demo-macos-x86_64.sum
+	cat demo-macos-x86_64.sum
+	ls -lah target/demo-macos-x86_64
+
+aarch64-macosx:
+	zig build install -Dtarget=aarch64-macos
+	mkdir -p target
+	mv zig-out/bin/demo target/demo-macos-aarch64
+	ls -lah target/demo-macos-aarch64
+
+# TODO: FreeBSD
+# TODO: NetBSD
+# TODO: OpenBSD

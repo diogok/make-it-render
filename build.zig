@@ -12,7 +12,7 @@ pub fn build(b: *std.Build) !void {
                     .optimize = optimize,
                 });
 
-                const exe = x11.artifact("demo-x11");
+                const exe = x11.artifact("demo");
                 b.installArtifact(exe);
 
                 const run_cmd = b.addRunArtifact(exe);
@@ -27,11 +27,26 @@ pub fn build(b: *std.Build) !void {
                     .optimize = optimize,
                 });
 
-                const exe = windows.artifact("demo-windows");
+                const exe = windows.artifact("demo");
                 b.installArtifact(exe);
 
                 const run_cmd = b.addRunArtifact(exe);
                 const run_step = b.step("run-demo-windows", "Run windows demo");
+                run_step.dependOn(&run_cmd.step);
+            }
+        },
+        .macos => {
+            {
+                const mac = b.anonymousDependency("src/macosx", @import("src/macosx/build.zig"), .{
+                    .target = target,
+                    .optimize = optimize,
+                });
+
+                const exe = mac.artifact("demo");
+                b.installArtifact(exe);
+
+                const run_cmd = b.addRunArtifact(exe);
+                const run_step = b.step("run-demo-mac", "Run mac demo");
                 run_step.dependOn(&run_cmd.step);
             }
         },
