@@ -67,8 +67,6 @@ x86_64-macosx:
 	zig build install -Dtarget=x86_64-macos.10.15-none
 	mkdir -p target
 	mv zig-out/bin/demo target/demo-macos-x86_64
-	shasum target/demo-macos-x86_64 > demo-macos-x86_64.sum
-	cat demo-macos-x86_64.sum
 	ls -lah target/demo-macos-x86_64
 
 aarch64-macosx:
