@@ -61,7 +61,8 @@ pub fn main() !void {
         byte_index += 4;
     }
 
-    const yellow_block_zpixmap = try x11.rgbaToZPixmapAlloc(allocator, info, win_req.parent_id, &yellow_block);
+    const imageInfo = x11.getImageInfo(info, win_req.parent_id);
+    const yellow_block_zpixmap = try x11.rgbaToZPixmapAlloc(allocator, imageInfo, &yellow_block);
     defer allocator.free(yellow_block_zpixmap);
 
     const put_image_req = x11.PutImage{
