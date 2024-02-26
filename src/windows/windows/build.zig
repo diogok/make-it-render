@@ -1,24 +1,24 @@
 const std = @import("std");
 
-pub fn build(b: *std.Build) !void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const x11 = b.addModule("x11", .{ .root_source_file = .{ .path = "x11.zig" } });
-
+    //const win32 = b.addModule("x11", .{ .root_source_file = .{ .path = "core.zig" } });
     {
         const exe = b.addExecutable(.{
-            .name = "demo",
+            .name = "demo-windows",
             .target = target,
             .optimize = optimize,
             .root_source_file = .{ .path = "demo.zig" },
         });
-        exe.root_module.addImport("x11", x11);
+
+        //exe.root_module.addImport("win32", win32);
 
         b.installArtifact(exe);
 
         const run_cmd = b.addRunArtifact(exe);
-        const run_step = b.step("run-demo", "Run demo");
+        const run_step = b.step("run-demo-windows", "Run demo for windows");
         run_step.dependOn(&run_cmd.step);
     }
 }

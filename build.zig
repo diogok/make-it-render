@@ -1,13 +1,13 @@
 const std = @import("std");
 
-pub fn build(b: *std.Build) !void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
     switch (target.result.os.tag) {
         .linux => {
             {
-                const x11 = b.anonymousDependency("src/x11", @import("src/x11/build.zig"), .{
+                const x11 = b.anonymousDependency("src/windows/x11", @import("src/windows/x11/build.zig"), .{
                     .target = target,
                     .optimize = optimize,
                 });
@@ -22,7 +22,7 @@ pub fn build(b: *std.Build) !void {
         },
         .windows => {
             {
-                const windows = b.anonymousDependency("src/windows", @import("src/windows/build.zig"), .{
+                const windows = b.anonymousDependency("src/windows/windows", @import("src/windows/windows/build.zig"), .{
                     .target = target,
                     .optimize = optimize,
                 });
@@ -37,7 +37,7 @@ pub fn build(b: *std.Build) !void {
         },
         .macos => {
             {
-                const mac = b.anonymousDependency("src/macosx", @import("src/macosx/build.zig"), .{
+                const mac = b.anonymousDependency("src/windows/macosx", @import("src/windows/macosx/build.zig"), .{
                     .target = target,
                     .optimize = optimize,
                 });
