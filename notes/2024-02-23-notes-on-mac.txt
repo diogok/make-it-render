@@ -1,0 +1,23 @@
+Notes on MacOSX
+
+Apple is famous for it's locked down ecosystem, and it really shows.
+
+Everything is focused on using Swift on XCode on MacOSX on Apple hardware. Even Object-c seems like a second-rank language in terms of support, and C just happens to work.
+
+Using the MacOSX SDK (the Frameworks) is only allowed on Apple hardware. VMs are only allowed on Apple hardware. There is no support for anything outside Apple.
+
+I don't own a Mac, so I wonder if I can even make it work.
+
+Documentation is confusing, because I need to go back and forth between the objc-runtime, bridgesupport and objc/swift docs to understand the arguments and return of a function. Also a lot is not documented, as it just stated "if you are using XCode this is taken care for you".
+
+There is also not much references and complete working code I can look into. There are some great bindings and generators in zig that can be used as reference, but technically those need to (or should...) be built on a Mac (if I understood correctly).
+
+Object-c actually looks like a fine language, but I have not really used it to know.
+
+By dynamicaly loading the libraries I think I am not going against the terms of Apple, because I did not download, link or ditribute any of the SDK. But hard to tell really.
+
+So I built on Linux and tested on someone else's Mac until an window appeared.
+
+The result works, but it is pretty clear that I am fighting against the system on this one. Apple does not want software like mine, it seems. But I persist, at least a little longer.
+
+This was the most frustating part so far.

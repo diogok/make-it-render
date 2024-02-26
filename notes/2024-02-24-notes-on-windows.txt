@@ -1,0 +1,19 @@
+Notes on Windows
+
+Windows, being a GUI focused OS, I expected it would be easy to create a window. And that is correct, it is super easy.
+
+A good thing about Windows for this context is that you can expect some basic functions will always be there.
+
+What made it super easy is that you can always count on win32 APIs, and operating a Window is the focus of a lot of it.
+
+Like any good legacy API there are quirks, but honestly not too bad.
+
+The most curious thing I found are the thousands of errors codes that some of those are not really errors and you have to ignore them sometimes. I am sure there is a reason.
+
+MS also provides free VMs for evaluation and tests, which makes it easy to test and develop on, and windows run in a lot of hardware.
+
+Mingw64, wine and many other tools are available to develop for Windows from Linux.
+
+This is working on x86_64 and arm64. Tested only on Windows 11.
+
+I think it will work out nicely.

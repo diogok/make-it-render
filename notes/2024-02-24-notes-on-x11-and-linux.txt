@@ -1,0 +1,29 @@
+Notes on X11 and Linux
+
+This was the first implementation I tried, because that is what I use daily. I actually run Wayland, but X11 cover more targets.
+
+I could have just used `linkSystemLib` to `libxcb`, that works great actually in other projects. But that leads to some difficulties for cross-compilation: It means I would need to have the libs for other the targets, so extra installations required. I could also pre-built for all architectures, but that is also an extra step outside of this project. Cross-compiling from other OSes would be another setup. It is easy to do this on a VM or docker or other, but it is an added complexity for maintanance.
+
+So, I wanted to be able to cross-compile from this project only, from and to any target, as much as possible. This is one of the super-powers of Zig, and I would like to learn to use it as much as possible.
+
+I tried to compile XCB from source and learned that XCB needs to generate some files from the X11 proto definition. This left me with either pre-generating them, which means I would not be using just a copy of the repo anymore. Or add the steps to generate them on my build processes, which required other tools.
+
+This is a common issue I face when compiling some C projects, there are always extra steps and some of those are not easy on cross-compilation. Granted, working with C projects is not something I have experience with, so there is some learning and extra resistance from me.
+
+Now, one of the great power of open-source is that it is, obviously, open-source, meaning 1. I have a lot of options and 2. I have access to the source code of those options. There is always a way.
+
+And X11 also made a great a choice: It is a protocol. This means I can just write bytes to a (unix-)socket and implement a client for it in any language. So that is what I did. That was the path I tried next, and suceeded.
+
+I was reluctant at first, being an old software that the protocol could be too hard, full of traps and such, but it is actually straight forward.
+
+X11 documentation is good but not complete, but where it lacks I can just check to the source code. The protocol and implementation does have some quirks, but for a long living, with lot of legacy and yet it "just works", I think it is pretty good.
+
+My implementation barely covers what I need to open an window, but it is clear how to expand to cover more when needed.
+
+Linux being free and open it is easy to test, I can grab an image a run in any VM for testing or developing. The challenge being that that are a lot of targets and versions.
+
+It compiles to x86, x86_64, arm, arm64 and riscv. I believe it will also work on BSDs with no or minimal changes, but have not tested yet.
+
+This first attempt goes to show what would work nicely, and is a preview of the difficulties I would face on other implementation.
+
+After lesssons learned, I think this turned out very good and I am happy with the results.
