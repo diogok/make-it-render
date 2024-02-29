@@ -1,4 +1,6 @@
 const std = @import("std");
+const term = @import("termprint.zig");
+
 const expectEqual = std.testing.expectEqual;
 
 pub const Point = struct {
@@ -286,4 +288,11 @@ test "draw line: vertical, bottom to top" {
 }
 
 // TODO: Arc
-// TODO: other curves
+// TODO: Other curves
+// TODO: Fill
+
+pub const termprint = term.print;
+
+test {
+    _ = @import("termprint.zig");
+}
