@@ -1,0 +1,6 @@
+.{
+    .name = "fontz",
+    .version = "0.0.0",
+    .paths = .{ "src", "fonts" },
+    .dependencies = .{},
+}

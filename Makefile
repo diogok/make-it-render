@@ -2,7 +2,7 @@
 all: linux windows macos
 
 clean:
-	rm -rf zig-out zig-cache target
+	rm -rf zig-out .zig-cache target
 
 linux: x86_64-linux x86-linux aarch64-linux arm-linux riscv64-linux
 

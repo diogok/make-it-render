@@ -1,0 +1,65 @@
+pub const WindowID = u32;
+pub const Height = u16;
+pub const Width = u16;
+pub const X = i16;
+pub const Y = i16;
+
+pub const BBox = struct {
+    height: Height,
+    width: Width,
+    x: X,
+    y: Y,
+};
+
+pub const WindowOptions = struct {
+    title: []const u8 = "",
+    width: Width = 640,
+    height: Height = 480,
+    x: X = 10,
+    y: Y = 10,
+};
+
+pub const WindowStatus = enum {
+    open,
+    closed,
+};
+
+pub const Image = struct {
+    width: Width,
+    height: Height,
+    rgba: []u8,
+};
+
+pub const Event = union(enum) {
+    nop: void,
+    close: WindowID,
+    draw: struct {
+        window_id: WindowID,
+        area: BBox,
+    },
+    mouse_pressed: struct {
+        x: X,
+        y: Y,
+        button: u8,
+        window_id: WindowID,
+    },
+    mouse_released: struct {
+        x: X,
+        y: Y,
+        button: u8,
+        window_id: WindowID,
+    },
+    mouse_moved: struct {
+        x: X,
+        y: Y,
+        window_id: WindowID,
+    },
+    key_pressed: struct {
+        key: u16,
+        window_id: WindowID,
+    },
+    key_released: struct {
+        key: u16,
+        window_id: WindowID,
+    },
+};

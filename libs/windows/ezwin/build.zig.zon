@@ -1,0 +1,10 @@
+.{
+    .name = "ezwin",
+    .version = "0.0.0",
+    .paths = .{"src"},
+    .dependencies = .{
+        .x11 = .{
+            .path = "../x11",
+        },
+    },
+}
