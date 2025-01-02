@@ -1,5 +1,5 @@
 const std = @import("std");
-const win = @import("win32");
+const win = @import("windows");
 
 const log = std.log.scoped(.main);
 

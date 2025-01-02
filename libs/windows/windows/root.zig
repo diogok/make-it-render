@@ -4,12 +4,15 @@ pub const Cursor = *anyopaque;
 pub const Brush = *anyopaque;
 pub const Menu = *anyopaque;
 pub const WindowHandle = *anyopaque;
+pub const ErrorCode = u32;
+
+pub const String = [*:0]const u16;
 
 pub const W = @import("std").unicode.utf8ToUtf16LeWithNull;
 pub const W2 = @import("std").unicode.utf8ToUtf16LeStringLiteral;
 
 pub extern "kernel32" fn GetModuleHandleExW(flags: u32, module_name: ?[*:0]const u16, module: ?*?Instance) callconv(.C) ?Instance;
-pub extern "kernel32" fn GetLastError() callconv(.C) u32;
+pub extern "kernel32" fn GetLastError() callconv(.C) ErrorCode;
 
 pub const WindowClass = extern struct {
     size: u32 = @sizeOf(@This()),
@@ -21,8 +24,8 @@ pub const WindowClass = extern struct {
     icon: ?Icon = null,
     cursor: ?Cursor = null,
     background: ?Brush = null,
-    menu_name: ?[*:0]const u16 = null,
-    class_name: ?[*:0]const u16,
+    menu_name: ?String = null,
+    class_name: ?String,
     icon_small: ?Icon = null,
 };
 
@@ -31,8 +34,8 @@ pub extern "user32" fn RegisterClassExW(window_class: ?*const WindowClass) callc
 pub const UseDefault = @as(i32, -2147483648);
 pub extern "user32" fn CreateWindowExW(
     ex_style: ExtendedWindowStyle,
-    class_name: ?[*:0]const u16,
-    window_name: ?[*:0]const u16,
+    class_name: ?String,
+    window_name: ?String,
     style: WindowStyle,
     x: i32,
     y: i32,
