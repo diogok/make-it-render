@@ -10,6 +10,12 @@ pub fn build(b: *std.Build) void {
     });
     const x11 = x11_dep.module("x11");
 
+    const windows_dep = b.dependency("windows", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const windows = windows_dep.module("windows");
+
     const ezwin = b.addModule(
         "ezwin",
         .{
@@ -17,6 +23,7 @@ pub fn build(b: *std.Build) void {
         },
     );
     ezwin.addImport("x11", x11);
+    ezwin.addImport("windows", windows);
 
     {
         const demo = b.addExecutable(.{
@@ -44,6 +51,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/root.zig"),
         });
         tests.root_module.addImport("x11", x11);
+        tests.root_module.addImport("windows", windows);
 
         const run_tests = b.addRunArtifact(tests);
         const run_tests_step = b.step("test", "Run tests");
@@ -58,6 +66,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/root.zig"),
         });
         docs.root_module.addImport("x11", x11);
+        docs.root_module.addImport("windows", windows);
 
         const install_docs = b.addInstallDirectory(.{
             .source_dir = docs.getEmittedDocs(),
