@@ -3,7 +3,7 @@ pub const Icon = *anyopaque;
 pub const Cursor = *anyopaque;
 pub const Brush = *anyopaque;
 pub const Menu = *anyopaque;
-pub const WindowHandle = *anyopaque;
+pub const WindowHandle = *anyopaque; // actually u32?
 pub const ErrorCode = u32;
 
 pub const String = [*:0]const u16;

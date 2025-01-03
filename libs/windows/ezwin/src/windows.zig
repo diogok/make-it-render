@@ -13,6 +13,12 @@ pub const WindowsWM = struct {
 
         const class_name = win.W2("WindowClass");
 
+        const self = @This(){
+            .allocator = allocator,
+            .instance = instance,
+            .class_name = class_name,
+        };
+
         const window_class: win.WindowClass = .{
             .style = @intFromEnum(win.ClassStyle.HREDRAW) | @intFromEnum(win.ClassStyle.VREDRAW),
             .window_procedure = windowProc,
@@ -21,28 +27,25 @@ pub const WindowsWM = struct {
         };
 
         _ = win.RegisterClassExW(&window_class);
-        return @This(){
-            .allocator = allocator,
-            .instance = instance,
-            .class_name = class_name,
-        };
+        return self;
     }
 
-    pub fn deinit(_: *@This()) void {}
+    pub fn deinit(_: *@This()) void {
+        win.PostQuitMessage(0);
+    }
 
     pub fn createWindow(self: *@This(), options: common.WindowOptions) !WindowsWindow {
         return try WindowsWindow.init(self, options);
     }
 
     pub fn receive(_: *@This()) !common.Event {
+        active = 0;
         var msg: win.Message = undefined;
         if (win.GetMessageW(&msg, null, 0, 0) > 0) {
             _ = win.TranslateMessage(&msg);
             _ = win.DispatchMessageW(&msg);
-            return .{ .nop = {} };
-        } else {
-            return .{ .close = 0 };
         }
+        return event[active];
     }
 };
 
@@ -95,14 +98,34 @@ pub const WindowsWindow = struct {
     pub fn draw(_: *@This(), _: u32, _: common.BBox) !void {}
 };
 
+var event = [_]common.Event{
+    .{ .nop = {} },
+    .{ .close = 0 },
+    .{
+        .draw = .{
+            .area = .{
+                .x = 0,
+                .y = 0,
+                .height = 0,
+                .width = 0,
+            },
+            .window_id = 0,
+        },
+    },
+};
+var active: usize = 0;
+
 pub fn windowProc(window_handle: win.WindowHandle, message_type: win.MessageType, wparam: usize, lparam: isize) callconv(.C) isize {
     switch (message_type) {
         .WM_DESTROY => {
-            win.PostQuitMessage(0);
-            return 0;
+            active = 1;
+        },
+        .WM_PAINT => {
+            active = 2;
         },
         else => {
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
         },
     }
+    return 0;
 }
