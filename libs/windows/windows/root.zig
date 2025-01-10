@@ -4,6 +4,7 @@ pub const Cursor = *anyopaque;
 pub const Brush = *anyopaque;
 pub const Menu = *anyopaque;
 pub const WindowHandle = *anyopaque;
+pub const DisplayHandle = *anyopaque;
 pub const ErrorCode = u32;
 
 pub const String = [*:0]const u16;
@@ -65,6 +66,8 @@ pub const Point = extern struct {
 
 pub const MessageType = enum(u32) {
     WM_DESTROY = 2,
+    WM_SIZE = 5,
+    WM_PAINT = 15,
     _,
 };
 
@@ -129,3 +132,51 @@ pub extern "user32" fn DefWindowProcW(
     wParam: usize,
     lParam: isize,
 ) callconv(.C) isize;
+
+pub const Rect = extern struct {
+    left: c_long,
+    top: c_long,
+    right: c_long,
+    bottom: c_long,
+};
+
+pub const PaintStruct = extern struct {
+    hdc: usize,
+    fErase: bool,
+    rcPaint: Rect,
+    fRestore: bool,
+    fIncUpdate: bool,
+    rgbReserved: [32]u8,
+};
+
+pub extern "user32" fn BeginPaint(
+    window_handle: WindowHandle,
+    lpPaint: *PaintStruct,
+) callconv(.C) ?DisplayHandle;
+
+pub extern "user32" fn EndPaint(
+    window_handle: WindowHandle,
+    lpPaint: *PaintStruct,
+) callconv(.C) isize;
+
+pub extern "user32" fn UpdateWindow(
+    window_handle: WindowHandle,
+) callconv(.C) isize;
+
+pub extern "dwmapi" fn DwmFlush() callconv(.C) isize;
+
+pub extern "user32" fn InvalidateRect(
+    window_handle: WindowHandle,
+    rect: ?*Rect,
+    erase: bool,
+) callconv(.C) isize;
+
+pub fn loLParam(lParam: isize) u16 {
+    const value: usize = @bitCast(lParam);
+    return @intCast(0xffff & value);
+}
+
+pub fn hiLParam(lParam: isize) u16 {
+    const value: usize = @bitCast(lParam);
+    return @intCast(0xffff & (value >> 16));
+}
