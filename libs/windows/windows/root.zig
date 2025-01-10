@@ -4,7 +4,6 @@ pub const Cursor = *anyopaque;
 pub const Brush = *anyopaque;
 pub const Menu = *anyopaque;
 pub const WindowHandle = *anyopaque;
-pub const WindowHandle = *anyopaque;
 pub const DisplayHandle = *anyopaque;
 pub const ErrorCode = u32;
 
