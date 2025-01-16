@@ -1,10 +1,11 @@
+pub const Handle = *anyopaque;
 pub const Instance = *anyopaque;
 pub const Icon = *anyopaque;
 pub const Cursor = *anyopaque;
 pub const Brush = *anyopaque;
 pub const Menu = *anyopaque;
-pub const WindowHandle = *anyopaque;
-pub const DisplayHandle = *anyopaque;
+pub const WindowHandle = Handle;
+pub const DisplayHandle = Handle;
 pub const ErrorCode = u32;
 
 pub const String = [*:0]const u16;
@@ -160,13 +161,13 @@ pub extern "user32" fn EndPaint(
 ) callconv(.C) isize;
 
 pub extern "user32" fn UpdateWindow(
-    window_handle: WindowHandle,
+    window_handle: ?WindowHandle,
 ) callconv(.C) isize;
 
 pub extern "dwmapi" fn DwmFlush() callconv(.C) isize;
 
 pub extern "user32" fn InvalidateRect(
-    window_handle: WindowHandle,
+    window_handle: ?WindowHandle,
     rect: ?*Rect,
     erase: bool,
 ) callconv(.C) isize;
@@ -180,3 +181,94 @@ pub fn hiLParam(lParam: isize) u16 {
     const value: usize = @bitCast(lParam);
     return @intCast(0xffff & (value >> 16));
 }
+
+pub const RasterOperation = enum(u32) {
+    BLACKNESS = 0b100001,
+    CAPTUREBLT,
+    DSTINVER,
+    MERGECOPY,
+    MERGEPAINT,
+    NOMIRRORBITMAP,
+    NOTSRCOPY,
+    NOTSRCEARE,
+    PATCOPY,
+    PATINVERT,
+    PATPAINT,
+    SRCAND,
+    SRCCOPY = 13369376,
+    SRCERASE,
+    SRCINVERT,
+    SRCPAINT,
+    WHITENESS,
+};
+
+pub extern "user32" fn BitBlt(
+    dstHDC: ?Handle,
+    dstX: i32,
+    dstY: i32,
+    dstWidth: i32,
+    dstHeight: i32,
+    srcHdc: ?Handle,
+    srcX: i32,
+    srcY: i32,
+    op: RasterOperation,
+) callconv(.C) isize;
+
+pub const BmiHeader = extern struct {
+    biSize: u32,
+    biWidth: i32,
+    biHeight: i32,
+    biPlanes: u16,
+    biBitCount: u16,
+    biCompression: u32,
+    biSizeImage: u32,
+    biXPelsPerMeter: i32,
+    biYPelsPerMeter: i32,
+    biClrUsed: u32,
+    biClrImportant: u32,
+};
+pub const BitmapInfo = extern struct {
+    bmiHeader: BmiHeader,
+    bmiColors: extern struct {
+        rgbBlue: u8,
+        rgbGreen: u8,
+        rgbRed: u8,
+        rgbReserved: u8,
+    },
+};
+
+pub extern "gdi32" fn CreateCompatibleDC(
+    handle: ?Handle,
+) callconv(.C) ?Handle;
+
+pub extern "gdi32" fn DeleteObject(
+    handle: ?Handle,
+) callconv(.C) bool;
+
+pub extern "user32" fn SelectObject(
+    handle0: ?Handle,
+    handle1: ?Handle,
+) callconv(.C) isize;
+
+pub const DIBUsage = enum(u32) {
+    RGB_COLORS = 0,
+    PAL_COLORS = 1,
+};
+
+pub extern "gdi32" fn CreateDIBSection(
+    handle: ?Handle,
+    pbmi: ?*const BitmapInfo,
+    usage: DIBUsage,
+    ppvBits: *[*]u8,
+    hSection: ?Handle,
+    offset: u32,
+) callconv(.C) ?Handle;
+
+pub extern "user32" fn GetDC(
+    handle: ?Handle,
+) callconv(.C) ?Handle;
+
+pub extern "user32" fn ReleaseDC(
+    window: ?WindowHandle,
+    handle: ?Handle,
+) callconv(.C) ?Handle;
