@@ -1,0 +1,6 @@
+.{
+    .name = "windowz",
+    .version = "0.0.0",
+    .paths = .{"src"},
+    .dependencies = .{},
+}

@@ -143,8 +143,8 @@ pub fn windowProc(
             _ = win.DwmFlush(); // wait for vsync, kinda
         },
         .WM_SIZE => {
-            width = win.loLParam(lparam);
-            height = win.hiLParam(lparam);
+            width = win.loword(lparam);
+            height = win.hiword(lparam);
             std.debug.print("Size {d}x{d}\n", .{ width, height });
 
             bitmap_info.bmiHeader.biWidth = width;

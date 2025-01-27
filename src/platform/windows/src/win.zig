@@ -172,12 +172,12 @@ pub extern "user32" fn InvalidateRect(
     erase: bool,
 ) callconv(.C) isize;
 
-pub fn loLParam(lParam: isize) u16 {
+pub fn loword(lParam: isize) u16 {
     const value: usize = @bitCast(lParam);
     return @intCast(0xffff & value);
 }
 
-pub fn hiLParam(lParam: isize) u16 {
+pub fn hiword(lParam: isize) u16 {
     const value: usize = @bitCast(lParam);
     return @intCast(0xffff & (value >> 16));
 }
