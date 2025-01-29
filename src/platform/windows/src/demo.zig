@@ -24,6 +24,16 @@ pub fn main() !void {
     };
 
     _ = win.RegisterClassExW(&window_class);
+    frame_handle = win.CreateCompatibleDC(null);
+    if (frame_handle == null) {
+        const err = win.GetLastError();
+        log.err("CreateCompatibleDC error: {any}", .{err});
+        return error.NoCompatibleDC;
+    }
+    bitmap_info.bmiHeader.biSize = @sizeOf(win.BmiHeader);
+    bitmap_info.bmiHeader.biPlanes = 1;
+    bitmap_info.bmiHeader.biBitCount = 32;
+    bitmap_info.bmiHeader.biCompression = 0;
 
     const window_handle = win.CreateWindowExW(
         win.ExtendedWindowStyle.OverlappedWindow,
@@ -50,18 +60,6 @@ pub fn main() !void {
         const err = win.GetLastError();
         log.err("ShowWindow error: {any}", .{err});
         return error.ShowWindowError;
-    }
-
-    bitmap_info.bmiHeader.biSize = @sizeOf(win.BmiHeader);
-    bitmap_info.bmiHeader.biPlanes = 1;
-    bitmap_info.bmiHeader.biBitCount = 32;
-    bitmap_info.bmiHeader.biCompression = 0;
-
-    frame_handle = win.CreateCompatibleDC(null);
-    if (frame_handle == null) {
-        const err = win.GetLastError();
-        log.err("CreateCompatibleDC error: {any}", .{err});
-        return error.NoCompatibleDC;
     }
 
     _ = win.UpdateWindow(window_handle);
