@@ -1,43 +1,40 @@
-pub const Handle = *anyopaque;
+// === Base functions
+
+/// An Instance of your module, you program. Retrieve it with GetModuleHandleW.
 pub const Instance = *anyopaque;
-pub const Icon = *anyopaque;
-pub const Cursor = *anyopaque;
-pub const Brush = *anyopaque;
-pub const Menu = *anyopaque;
-pub const WindowHandle = Handle;
-pub const DisplayHandle = Handle;
-pub const ErrorCode = u32;
 
 pub const String = [*:0]const u16;
 
+/// For allocated (non comptime known) Strings
 pub const W = @import("std").unicode.utf8ToUtf16LeWithNull;
+/// For comptime known Strings
 pub const W2 = @import("std").unicode.utf8ToUtf16LeStringLiteral;
 
-pub extern "kernel32" fn GetModuleHandleExW(flags: u32, module_name: ?[*:0]const u16, module: ?*?Instance) callconv(.C) ?Instance;
-pub extern "kernel32" fn GetLastError() callconv(.C) ErrorCode;
+/// Return your program module Instance.
+pub extern "kernel32" fn GetModuleHandleW(moduleName: ?String) callconv(.C) ?Instance;
+/// Return the last error number, check on MS documentation what the code means.
+pub extern "kernel32" fn GetLastError() callconv(.C) u32;
 
-pub const WindowClass = extern struct {
-    size: u32 = @sizeOf(@This()),
-    style: u32 = 0,
-    window_procedure: ?WindowProcedure,
-    class_extra: i32 = 0,
-    window_extra: i32 = 0,
-    instance: ?Instance,
-    icon: ?Icon = null,
-    cursor: ?Cursor = null,
-    background: ?Brush = null,
-    menu_name: ?String = null,
-    class_name: ?String,
-    icon_small: ?Icon = null,
-};
+pub fn loword(lParam: isize) u16 {
+    const value: usize = @bitCast(lParam);
+    return @intCast(0xffff & value);
+}
 
-pub extern "user32" fn RegisterClassExW(window_class: ?*const WindowClass) callconv(.C) u16;
+pub fn hiword(lParam: isize) u16 {
+    const value: usize = @bitCast(lParam);
+    return @intCast(0xffff & (value >> 16));
+}
 
-pub const UseDefault = @as(i32, -2147483648);
+// === Window & messages
+
+pub extern "user32" fn RegisterClassExW(
+    window_class: ?*const WindowClass,
+) callconv(.C) WindowClassAtom;
+
 pub extern "user32" fn CreateWindowExW(
     ex_style: ExtendedWindowStyle,
     class_name: ?String,
-    window_name: ?String,
+    title: ?String,
     style: WindowStyle,
     x: i32,
     y: i32,
@@ -49,33 +46,79 @@ pub extern "user32" fn CreateWindowExW(
     lpParam: ?*anyopaque,
 ) callconv(.C) ?WindowHandle;
 
-pub extern "user32" fn ShowWindow(window_handle: ?WindowHandle, display: u32) callconv(.C) ?WindowHandle;
+pub extern "user32" fn ShowWindow(
+    window_handle: ?WindowHandle,
+    display: u32,
+) callconv(.C) ?WindowHandle;
 
-pub const Message = extern struct {
-    hwnd: ?WindowHandle,
-    message: MessageType,
+pub extern "user32" fn GetMessageW(
+    message: ?*Message,
+    window_handle: ?WindowHandle,
+    filter_min: u32,
+    filter_max: u32,
+) callconv(.C) i32;
+
+pub extern "user32" fn TranslateMessage(
+    message: ?*const Message,
+) callconv(.C) c_int;
+
+pub extern "user32" fn DispatchMessageW(
+    lpMsg: ?*const Message,
+) callconv(.C) isize;
+
+/// End the program.
+pub extern "user32" fn PostQuitMessage(
+    val: i32,
+) callconv(.C) void;
+
+/// WindowProcedure is the function signature to handle window messages.
+pub const WindowProcedure = switch (@import("builtin").zig_backend) {
+    .stage1 => fn (
+        window_handle: WindowHandle,
+        message_type: MessageType,
+        wParam: usize,
+        lParam: isize,
+    ) callconv(.C) isize,
+    else => *const fn (
+        window_handle: WindowHandle,
+        message_type: MessageType,
+        wParam: usize,
+        lParam: isize,
+    ) callconv(.C) isize,
+};
+
+/// This is the default handler for windows procedures/messages.
+/// Use it to handle messages that your application will not handle,
+/// to ensure all messages are handled.
+pub extern "user32" fn DefWindowProcW(
+    window_handle: WindowHandle,
+    message_type: MessageType,
     wParam: usize,
     lParam: isize,
-    time: u32,
-    pt: Point,
-};
+) callconv(.C) isize;
 
-pub const Point = extern struct {
-    x: i32,
-    y: i32,
-};
+pub const WindowHandle = *anyopaque;
+pub const WindowClassAtom = u16;
 
-pub const MessageType = enum(u32) {
-    WM_DESTROY = 2,
-    WM_SIZE = 5,
-    WM_PAINT = 15,
-    _,
-};
+pub const Icon = *anyopaque;
+pub const Cursor = *anyopaque;
+pub const Brush = *anyopaque;
+pub const Menu = *anyopaque;
 
-pub extern "user32" fn GetMessageW(message: ?*Message, window_handle: ?WindowHandle, filter_min: u32, filter_max: u32) callconv(.C) i32;
-pub extern "user32" fn TranslateMessage(message: ?*const Message) callconv(.C) c_int;
-pub extern "user32" fn DispatchMessageW(lpMsg: ?*const Message) callconv(.C) isize;
-pub extern "user32" fn PostQuitMessage(val: i32) callconv(.C) void;
+pub const WindowClass = extern struct {
+    size: u32 = @sizeOf(@This()),
+    style: u32 = @intFromEnum(ClassStyle.HREDRAW) | @intFromEnum(ClassStyle.VREDRAW),
+    window_procedure: ?WindowProcedure = DefWindowProcW,
+    class_extra: i32 = 0,
+    window_extra: i32 = 0,
+    instance: ?Instance,
+    icon: ?Icon = null,
+    cursor: ?Cursor = null,
+    background: ?Brush = null,
+    menu_name: ?String = null,
+    class_name: ?String,
+    icon_small: ?Icon = null,
+};
 
 pub const ExtendedWindowStyle = enum(u32) {
     OverlappedWindow = 0x00000300,
@@ -112,57 +155,34 @@ pub const ClassStyle = enum(u32) {
     DROPSHADOW = 131072,
 };
 
-pub const WindowProcedure = switch (@import("builtin").zig_backend) {
-    .stage1 => fn (
-        window_handle: WindowHandle,
-        message_type: MessageType,
-        wParam: usize,
-        lParam: isize,
-    ) callconv(.C) isize,
-    else => *const fn (
-        window_handle: WindowHandle,
-        message_type: MessageType,
-        wParam: usize,
-        lParam: isize,
-    ) callconv(.C) isize,
-};
+pub const UseDefault = @as(i32, -2147483648);
 
-pub extern "user32" fn DefWindowProcW(
-    window_handle: WindowHandle,
-    message_type: MessageType,
+pub const Message = extern struct {
+    hwnd: ?WindowHandle,
+    message: MessageType,
     wParam: usize,
     lParam: isize,
-) callconv(.C) isize;
-
-pub const Rect = extern struct {
-    left: c_long,
-    top: c_long,
-    right: c_long,
-    bottom: c_long,
+    time: u32,
+    pt: Point,
 };
 
-pub const PaintStruct = extern struct {
-    hdc: usize,
-    fErase: bool,
-    rcPaint: Rect,
-    fRestore: bool,
-    fIncUpdate: bool,
-    rgbReserved: [32]u8,
+pub const Point = extern struct {
+    x: i32,
+    y: i32,
 };
 
-pub extern "user32" fn BeginPaint(
-    window_handle: WindowHandle,
-    lpPaint: *PaintStruct,
-) callconv(.C) ?DisplayHandle;
+pub const MessageType = enum(u32) {
+    WM_DESTROY = 2,
+    WM_SIZE = 5,
+    WM_PAINT = 15,
+    _,
+};
 
-pub extern "user32" fn EndPaint(
-    window_handle: WindowHandle,
-    lpPaint: *PaintStruct,
-) callconv(.C) isize;
+// === Drawing
 
 pub extern "user32" fn UpdateWindow(
     window_handle: ?WindowHandle,
-) callconv(.C) isize;
+) callconv(.C) bool;
 
 pub extern "dwmapi" fn DwmFlush() callconv(.C) isize;
 
@@ -170,17 +190,108 @@ pub extern "user32" fn InvalidateRect(
     window_handle: ?WindowHandle,
     rect: ?*Rect,
     erase: bool,
-) callconv(.C) isize;
+) callconv(.C) bool;
 
-pub fn loword(lParam: isize) u16 {
-    const value: usize = @bitCast(lParam);
-    return @intCast(0xffff & value);
-}
+pub extern "user32" fn BeginPaint(
+    window_handle: WindowHandle,
+    paint: *Paint,
+) callconv(.C) ?DeviceContext;
 
-pub fn hiword(lParam: isize) u16 {
-    const value: usize = @bitCast(lParam);
-    return @intCast(0xffff & (value >> 16));
-}
+pub extern "user32" fn EndPaint(
+    window_handle: WindowHandle,
+    lpPaint: *Paint,
+) callconv(.C) bool;
+
+pub extern "user32" fn GetDC(
+    handle: ?WindowHandle,
+) callconv(.C) ?DeviceContext;
+
+pub extern "user32" fn ReleaseDC(
+    window: ?WindowHandle,
+    handle: ?DeviceContext,
+) callconv(.C) c_int;
+
+pub extern "user32" fn BitBlt(
+    dstHDC: ?DeviceContext,
+    dstX: i32,
+    dstY: i32,
+    dstWidth: i32,
+    dstHeight: i32,
+    srcHdc: ?DeviceContext,
+    srcX: i32,
+    srcY: i32,
+    op: RasterOperation,
+) callconv(.C) bool;
+
+pub extern "gdi32" fn CreateCompatibleDC(
+    handle: ?DeviceContext,
+) callconv(.C) ?DeviceContext;
+
+pub extern "user32" fn SelectObject(
+    handle0: ?DeviceContext,
+    handle1: ?Bitmap,
+) callconv(.C) DeviceContext;
+
+pub extern "gdi32" fn DeleteObject(
+    handle: ?Bitmap,
+) callconv(.C) bool;
+
+pub extern "gdi32" fn CreateDIBSection(
+    handle: ?DeviceContext,
+    pbmi: ?*const BitmapInfo,
+    usage: DIBUsage,
+    ppvBits: *[*]u8,
+    hSection: ?*anyopaque,
+    offset: u32,
+) callconv(.C) ?Bitmap;
+
+pub const DeviceContext = *anyopaque;
+pub const Bitmap = *anyopaque;
+
+pub const Paint = extern struct {
+    device_context: usize,
+    erase: bool = false,
+    rect: Rect = Rect{},
+    restore: bool = false,
+    incUpdate: bool = false,
+    rgbReserved: [32]u8 = undefined,
+};
+
+pub const Rect = extern struct {
+    left: c_long = 0,
+    top: c_long = 0,
+    right: c_long = 0,
+    bottom: c_long = 0,
+};
+
+pub const BitmapInfo = extern struct {
+    header: BitmapInfoHeader = .{},
+    colors: extern struct {
+        blue: u8 = 0,
+        green: u8 = 0,
+        red: u8 = 0,
+        reserved: u8 = 0,
+    } = .{},
+};
+
+pub const BitmapInfoHeader = extern struct {
+    size: u32 = @sizeOf(@This()),
+    width: i32 = 0,
+    height: i32 = 0,
+    planes: u16 = 1,
+    bitCount: u16 = 32,
+    compression: u32 = 0,
+    sizeImage: u32 = 0,
+    xPelsPerMeter: i32 = 0,
+    yPelsPerMeter: i32 = 0,
+    clrUsed: u32 = 0,
+    clrImportant: u32 = 0,
+};
+
+pub const DIBUsage = enum(u32) {
+    RGB_COLORS = 0,
+    PAL_COLORS = 1,
+};
 
 pub const RasterOperation = enum(u32) {
     BLACKNESS = 0b100001,
@@ -201,74 +312,3 @@ pub const RasterOperation = enum(u32) {
     SRCPAINT,
     WHITENESS,
 };
-
-pub extern "user32" fn BitBlt(
-    dstHDC: ?Handle,
-    dstX: i32,
-    dstY: i32,
-    dstWidth: i32,
-    dstHeight: i32,
-    srcHdc: ?Handle,
-    srcX: i32,
-    srcY: i32,
-    op: RasterOperation,
-) callconv(.C) isize;
-
-pub const BmiHeader = extern struct {
-    biSize: u32,
-    biWidth: i32,
-    biHeight: i32,
-    biPlanes: u16,
-    biBitCount: u16,
-    biCompression: u32,
-    biSizeImage: u32,
-    biXPelsPerMeter: i32,
-    biYPelsPerMeter: i32,
-    biClrUsed: u32,
-    biClrImportant: u32,
-};
-pub const BitmapInfo = extern struct {
-    bmiHeader: BmiHeader,
-    bmiColors: extern struct {
-        rgbBlue: u8,
-        rgbGreen: u8,
-        rgbRed: u8,
-        rgbReserved: u8,
-    },
-};
-
-pub extern "gdi32" fn CreateCompatibleDC(
-    handle: ?Handle,
-) callconv(.C) ?Handle;
-
-pub extern "gdi32" fn DeleteObject(
-    handle: ?Handle,
-) callconv(.C) bool;
-
-pub extern "user32" fn SelectObject(
-    handle0: ?Handle,
-    handle1: ?Handle,
-) callconv(.C) isize;
-
-pub const DIBUsage = enum(u32) {
-    RGB_COLORS = 0,
-    PAL_COLORS = 1,
-};
-
-pub extern "gdi32" fn CreateDIBSection(
-    handle: ?Handle,
-    pbmi: ?*const BitmapInfo,
-    usage: DIBUsage,
-    ppvBits: *[*]u8,
-    hSection: ?Handle,
-    offset: u32,
-) callconv(.C) ?Handle;
-
-pub extern "user32" fn GetDC(
-    handle: ?Handle,
-) callconv(.C) ?Handle;
-
-pub extern "user32" fn ReleaseDC(
-    window: ?WindowHandle,
-    handle: ?Handle,
-) callconv(.C) ?Handle;

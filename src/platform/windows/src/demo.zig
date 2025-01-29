@@ -1,51 +1,58 @@
+//! Example usage of Windows APIs to create an window, get input events and draw to it.
+
 const std = @import("std");
 const win = @import("windows");
 
 const log = std.log.scoped(.main);
+
+var frame_handle: ?win.DeviceContext = null;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() != .leak);
     const allocator = gpa.allocator();
 
-    const instance = win.GetModuleHandleExW(0, null, null);
-    log.debug("Called main {any} {any}", .{ std.builtin.subsystem, instance });
+    // Get our own program instance handle.
+    const instance = win.GetModuleHandleW(null);
 
-    //const class_name = win.W2("HelloClass"); // For string literals, comptime known
-    const class_name = try win.W(allocator, "HelloClass");
+    // Convert our string to one Windows can use.
+    const class_name = try win.W(allocator, "HelloClass"); // for runtime known strings
     defer allocator.free(class_name);
 
+    const title = win.W2("Hello world!"); // For string literals, comptime known
+
+    // Configure our windows class with typical options
     var window_class: win.WindowClass = .{
         .style = @intFromEnum(win.ClassStyle.HREDRAW) | @intFromEnum(win.ClassStyle.VREDRAW),
-        //.hbrBackground = @as(c.HBRUSH,c.GetStockObject(c.WHITE_BRUSH)),
         .window_procedure = windowProc,
         .instance = instance,
         .class_name = class_name,
     };
 
+    // Register the class to use later to create the window.
     _ = win.RegisterClassExW(&window_class);
+
+    // Create a DeviceContext, used for part of drawing phase.
+    // Must be done before create window be cause we might be messages right as the window is created.
     frame_handle = win.CreateCompatibleDC(null);
     if (frame_handle == null) {
         const err = win.GetLastError();
         log.err("CreateCompatibleDC error: {any}", .{err});
         return error.NoCompatibleDC;
     }
-    bitmap_info.bmiHeader.biSize = @sizeOf(win.BmiHeader);
-    bitmap_info.bmiHeader.biPlanes = 1;
-    bitmap_info.bmiHeader.biBitCount = 32;
-    bitmap_info.bmiHeader.biCompression = 0;
 
+    // Create our window.
     const window_handle = win.CreateWindowExW(
         win.ExtendedWindowStyle.OverlappedWindow,
         class_name,
-        class_name,
+        title,
         win.WindowStyle.OverlappedWindow,
         win.UseDefault, // x
         win.UseDefault, // y
         win.UseDefault, // width
         win.UseDefault, // height
-        null,
-        null,
+        null, // parent
+        null, // menu
         instance,
         null,
     );
@@ -55,6 +62,7 @@ pub fn main() !void {
         return error.CreateWindowError;
     }
 
+    // Show the window.
     const show_result = win.ShowWindow(window_handle, 10);
     if (show_result != null) {
         const err = win.GetLastError();
@@ -62,8 +70,10 @@ pub fn main() !void {
         return error.ShowWindowError;
     }
 
+    // Request the first window update, not really needed.
     _ = win.UpdateWindow(window_handle);
 
+    // The main loop to process events and draw.
     var msg: win.Message = undefined;
     while (win.GetMessageW(&msg, null, 0, 0) > 0) {
         _ = win.TranslateMessage(&msg);
@@ -75,12 +85,11 @@ pub fn main() !void {
 }
 
 var pixels: [*]u8 = undefined;
-var bitmap_info = std.mem.zeroes(win.BitmapInfo);
-var bitmap: ?*anyopaque = null;
-var frame_handle: ?*anyopaque = null;
+var bitmap: ?win.Bitmap = null;
 var width: i32 = 0;
 var height: i32 = 0;
 
+/// Function to process messages, input and draw.
 pub fn windowProc(
     window_handle: win.WindowHandle,
     message_type: win.MessageType,
@@ -92,8 +101,9 @@ pub fn windowProc(
             win.PostQuitMessage(0);
         },
         .WM_PAINT => {
-            std.debug.print("paiting...\n", .{});
-            var paint = std.mem.zeroes(win.PaintStruct);
+            // The paint struct will receive paint specs from BeginPaint.
+            var paint = std.mem.zeroes(win.Paint);
+            // BeginPain will fill in Paint struct and give us somewhere to draw to.
             const display_handle = win.BeginPaint(window_handle, &paint);
             if (display_handle == null) {
                 const err = win.GetLastError();
@@ -101,6 +111,8 @@ pub fn windowProc(
                 return 0;
             }
 
+            // Paint it red.
+            // BGRA
             var i: usize = 0;
             while (i < (height * width) * 4) : (i += 4) {
                 pixels[i] = 0;
@@ -108,56 +120,65 @@ pub fn windowProc(
                 pixels[i + 2] = 255;
                 pixels[i + 3] = 0;
             }
-            std.debug.print("size {d}\n", .{i});
-            std.debug.print("sample {any}\n", .{pixels[0..12]});
-            std.debug.print("paint {any}\n", .{paint});
 
-            const r = win.BitBlt(
+            // BitBlt operate data from one handle to another.
+            // in this case it just copies.
+            const bitBltResult = win.BitBlt(
                 display_handle,
-                paint.rcPaint.left,
-                paint.rcPaint.top,
-                paint.rcPaint.right - paint.rcPaint.left,
-                paint.rcPaint.bottom - paint.rcPaint.top,
+                paint.rect.left,
+                paint.rect.top,
+                paint.rect.right - paint.rect.left,
+                paint.rect.bottom - paint.rect.top,
                 frame_handle,
-                paint.rcPaint.left,
-                paint.rcPaint.top,
+                paint.rect.left,
+                paint.rect.top,
                 .SRCCOPY,
             );
-            log.debug("bit {d}", .{r});
-            if (r == 0) {
+            if (!bitBltResult) {
                 const err = win.GetLastError();
                 log.err("BitBlt error: {any}", .{err});
                 return 0;
             }
 
-            const er = win.EndPaint(window_handle, &paint);
-            log.debug("ep {d}", .{er});
-            if (er == 0) {
-                const err = win.GetLastError();
-                log.err("EndPaint: {any}", .{err});
-                return 0;
-            }
-
+            _ = win.EndPaint(window_handle, &paint);
             _ = win.DwmFlush(); // wait for vsync, kinda
         },
         .WM_SIZE => {
+            // extract size from param
             width = win.loword(lparam);
             height = win.hiword(lparam);
-            std.debug.print("Size {d}x{d}\n", .{ width, height });
 
-            bitmap_info.bmiHeader.biWidth = width;
-            bitmap_info.bmiHeader.biHeight = height * -1;
+            // recrete our frame when the window resizes
+            const bitmap_info = win.BitmapInfo{
+                .header = .{
+                    .width = width,
+                    .height = height * -1,
+                },
+            };
 
+            // delete existing bitmap if it is set.
             if (bitmap != null) _ = win.DeleteObject(bitmap);
-            bitmap = win.CreateDIBSection(null, &bitmap_info, .RGB_COLORS, &pixels, null, 0);
+
+            // create a new frame
+            bitmap = win.CreateDIBSection(
+                null,
+                &bitmap_info,
+                .RGB_COLORS,
+                &pixels,
+                null,
+                0,
+            );
             if (bitmap == null) {
                 const err = win.GetLastError();
                 log.err("CreateDIBSection error: {any}", .{err});
                 return 0;
             }
+
+            // select this bitmap on our frame_handle
             _ = win.SelectObject(frame_handle, bitmap);
         },
         else => {
+            // let default proc handle other messages
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
         },
     }
