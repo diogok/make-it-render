@@ -24,6 +24,13 @@ pub fn hiword(lParam: isize) u16 {
     const value: usize = @bitCast(lParam);
     return @intCast(0xffff & (value >> 16));
 }
+pub fn loword2(wParam: usize) u16 {
+    return @intCast(0xffff & wParam);
+}
+
+pub fn hiword2(wParam: usize) u16 {
+    return @intCast(0xffff & (wParam >> 16));
+}
 
 pub fn lobyte(val: u16) u8 {
     const bits: [2]u8 = @bitCast(val);
@@ -234,7 +241,7 @@ pub const ControlKeys = enum(u32) {
     MK_XBUTTON2 = 0x0040,
 };
 
-pub const VirtualKeys = enum(u16) { VK_LBUTTON = 0x01, VK_RBUTTON, VK_CANCEL };
+pub const VirtualKeys = @import("vk.zig").VirtualKeys;
 
 /// Used to check details about keyboard input
 pub const KeystrokeFlags = packed struct {
@@ -247,6 +254,10 @@ pub const KeystrokeFlags = packed struct {
     transitionState: u1,
     pad: u32,
 };
+
+pub fn mouseWheelDelta(wparam: usize) i16 {
+    return @bitCast(hiword2(wparam));
+}
 
 // === Cursors
 

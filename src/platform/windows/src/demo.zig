@@ -200,12 +200,13 @@ pub fn windowProc(
             log.debug("M1 down at {d}x{d}", .{ x, y });
         },
         .WM_MOUSEWHEEL => {
-            // TODO: https://learn.microsoft.com/pt-br/windows/win32/inputdev/wm-mousewheel
+            const delta: i16 = win.mouseWheelDelta(wparam);
+            log.debug("mouse wheel {any}", .{delta});
         },
         .WM_KEYDOWN => {
-            // TODO: https://learn.microsoft.com/pt-br/windows/win32/inputdev/wm-keydown
+            const key: win.VirtualKeys = @enumFromInt((wparam));
             const keyFlags: win.KeystrokeFlags = @bitCast(lparam);
-            log.debug("keystroke {any}", .{keyFlags});
+            log.debug("keystroke {any} {any}", .{ key, keyFlags });
         },
         else => {
             // let default proc handle other messages
