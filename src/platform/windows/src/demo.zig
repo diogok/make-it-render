@@ -204,6 +204,8 @@ pub fn windowProc(
         },
         .WM_KEYDOWN => {
             // TODO: https://learn.microsoft.com/pt-br/windows/win32/inputdev/wm-keydown
+            const keyFlags: win.KeystrokeFlags = @bitCast(lparam);
+            log.debug("keystroke {any}", .{keyFlags});
         },
         else => {
             // let default proc handle other messages

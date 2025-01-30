@@ -25,6 +25,22 @@ pub fn hiword(lParam: isize) u16 {
     return @intCast(0xffff & (value >> 16));
 }
 
+pub fn lobyte(val: u16) u8 {
+    const bits: [2]u8 = @bitCast(val);
+    return switch (comptime @import("builtin").cpu.arch.endian()) {
+        .big => return bits[1],
+        .little => return bits[0],
+    };
+}
+
+pub fn hibyte(val: u16) u8 {
+    const bits: [2]u8 = @bitCast(val);
+    return switch (comptime @import("builtin").cpu.arch.endian()) {
+        .Big => return bits[0],
+        .Little => return bits[1],
+    };
+}
+
 // === Window & messages
 
 pub extern "user32" fn RegisterClassExW(
@@ -183,8 +199,10 @@ pub const MessageType = enum(u32) {
     WM_PAINT = 0x000F, //15,
     WM_KEYDOWN = 0x0100,
     WM_KEYUP = 0x0101,
-    WM_SYSKEYUP = 0x0105,
+    WM_CHAR = 0x0102,
+    WM_DEADCHAR = 0x0103,
     WM_SYSKEYDOWN = 0x0104,
+    WM_SYSKEYUP = 0x0105,
     WM_LBUTTONDOWN = 0x0201,
     WM_LBUTTONUP = 0x0202,
     WM_LBUTTONDBLCLK = 0x0203,
@@ -203,6 +221,8 @@ pub const MessageType = enum(u32) {
     _,
 };
 
+// === Input controls
+
 /// Used to check wParam from messages, as a mask(?).
 pub const ControlKeys = enum(u32) {
     MK_LBUTTON = 0x0001,
@@ -212,6 +232,20 @@ pub const ControlKeys = enum(u32) {
     MK_MBUTTON = 0x0010,
     MK_XBUTTON1 = 0x0020,
     MK_XBUTTON2 = 0x0040,
+};
+
+pub const VirtualKeys = enum(u16) { VK_LBUTTON = 0x01, VK_RBUTTON, VK_CANCEL };
+
+/// Used to check details about keyboard input
+pub const KeystrokeFlags = packed struct {
+    count: u16,
+    scanCode: u8,
+    extended: u1,
+    reserved: u4,
+    context: u1,
+    previousState: u1,
+    transitionState: u1,
+    pad: u32,
 };
 
 // === Cursors
