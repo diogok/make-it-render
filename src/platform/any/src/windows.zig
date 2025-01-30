@@ -53,11 +53,13 @@ pub const WindowsWM = struct {
 
 pub const WindowsWindow = struct {
     wm: *WindowsWM,
-    handle: ?win.WindowHandle,
+    handle: win.WindowHandle,
 
     title: [:0]u16,
 
     status: common.WindowStatus,
+
+    images: std.ArrayList(ImageHandler),
 
     pub fn init(wm: *WindowsWM, options: common.WindowOptions) !@This() {
         const title = try win.W(wm.allocator, options.title);
@@ -76,30 +78,116 @@ pub const WindowsWindow = struct {
             wm.instance,
             null,
         );
+        if (handle == null) {
+            return error.CreateWindowError;
+        }
 
         _ = win.ShowWindow(handle, 10);
         while (win.ShowCursor(true) < 1) {}
 
         return @This(){
             .wm = wm,
-            .handle = handle,
+            .handle = handle.?,
             .status = .open,
             .title = title,
+            .images = std.ArrayList(ImageHandler).init(wm.allocator),
         };
     }
 
     pub fn destroy(self: *@This()) !void {
+        self.images.deinit();
         self.wm.allocator.free(self.title);
         self.status = .closed;
     }
 
-    pub fn createImage(_: *@This(), _: common.Image) !u32 {
-        return 0;
+    pub fn createImage(self: *@This(), img: common.Image) !common.ImageID {
+        const imageID = self.images.items.len;
+
+        var pixels: [*]u8 = undefined;
+        const bitmap_info = win.BitmapInfo{
+            .header = .{
+                .width = img.width,
+                .height = img.height,
+            },
+        };
+
+        const bitmap = win.CreateDIBSection(
+            null,
+            &bitmap_info,
+            .RGB_COLORS,
+            &pixels,
+            null,
+            0,
+        );
+        if (bitmap == null) {
+            const err = win.GetLastError();
+            std.debug.print("CreateDIBSection error: {any}\n", .{err});
+            return error.ErrorCreatingImage;
+        }
+
+        const frame = win.CreateCompatibleDC(null);
+        if (frame == null) {
+            const err = win.GetLastError();
+            std.debug.print("CreateCompatibleDC error: {any}\n", .{err});
+            return error.ErrorCreatingCompatibleDeviceContext;
+        }
+
+        _ = win.SelectObject(frame, bitmap);
+
+        // RGB to BGR
+        var i: usize = 0;
+        while (i < img.pixels.len) : (i += 4) {
+            pixels[i] = img.pixels[i + 2];
+            pixels[i + 1] = img.pixels[i + 1];
+            pixels[i + 2] = img.pixels[i];
+            pixels[i + 3] = img.pixels[i + 3];
+        }
+
+        const image = ImageHandler{
+            .bitmap = bitmap.?,
+            .frame = frame.?,
+        };
+        try self.images.append(image);
+
+        return @truncate(imageID);
     }
 
     pub fn clear(_: *@This()) !void {}
 
-    pub fn draw(_: *@This(), _: u32, _: common.BBox) !void {}
+    pub fn draw(self: *@This(), imageID: common.ImageID, target: common.BBox) !void {
+        var paint = std.mem.zeroes(win.Paint);
+        const display = win.BeginPaint(self.handle, &paint);
+        if (display == null) {
+            const err = win.GetLastError();
+            std.debug.print("Beginpaint error: {any}\n", .{err});
+            return error.ErrorBeginPaint;
+        }
+        defer _ = win.EndPaint(self.handle, &paint);
+
+        const imageHandler = self.images.items[imageID];
+
+        const bitBltResult = win.BitBlt(
+            display,
+            target.x,
+            target.y,
+            target.width,
+            target.height,
+            imageHandler.frame,
+            0,
+            0,
+            .SRCCOPY,
+        );
+        if (!bitBltResult) {
+            const err = win.GetLastError();
+            std.debug.print("BitBlt error: {any}", .{err});
+            return error.ErrorBitBlt;
+        }
+    }
+};
+
+const ImageHandler = struct {
+    bitmap: win.Bitmap,
+    frame: win.DeviceContext,
 };
 
 var event = [_]common.Event{
@@ -119,7 +207,12 @@ var event = [_]common.Event{
 };
 var active: usize = 0;
 
-pub fn windowProc(window_handle: win.WindowHandle, message_type: win.MessageType, wparam: usize, lparam: isize) callconv(.C) isize {
+pub fn windowProc(
+    window_handle: win.WindowHandle,
+    message_type: win.MessageType,
+    wparam: usize,
+    lparam: isize,
+) callconv(.C) isize {
     switch (message_type) {
         .WM_DESTROY => {
             active = 1;

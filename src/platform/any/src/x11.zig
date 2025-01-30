@@ -223,7 +223,7 @@ pub const X11Window = struct {
         self.status = .closed;
     }
 
-    pub fn createImage(self: *@This(), image: common.Image) !u32 {
+    pub fn createImage(self: *@This(), image: common.Image) !common.ImageID {
         const image_info = x11.getImageInfo(self.wm.info, self.root);
 
         const pixmap_id = try self.wm.xid.genID();
@@ -249,6 +249,7 @@ pub const X11Window = struct {
             .depth = pixmap_req.depth,
         };
         try x11.sendWithBytes(self.wm.conn, put_image_req, zpixmap);
+
         return pixmap_id;
     }
 
@@ -259,7 +260,7 @@ pub const X11Window = struct {
         try x11.send(self.wm.conn, clear_area);
     }
 
-    pub fn draw(self: *@This(), pixmap_id: u32, target: common.BBox) !void {
+    pub fn draw(self: *@This(), pixmap_id: common.ImageID, target: common.BBox) !void {
         const copy_area_req = x11.CopyArea{
             .src_drawable_id = pixmap_id,
             .dst_drawable_id = self.window_id,

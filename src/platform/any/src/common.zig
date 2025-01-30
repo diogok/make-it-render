@@ -1,4 +1,5 @@
 pub const WindowID = u32;
+pub const ImageID = u32;
 pub const Height = u16;
 pub const Width = u16;
 pub const X = i16;
@@ -27,7 +28,8 @@ pub const WindowStatus = enum {
 pub const Image = struct {
     width: Width,
     height: Height,
-    rgba: []u8,
+    /// RGBA pixels
+    pixels: []u8,
 };
 
 pub const Event = union(enum) {

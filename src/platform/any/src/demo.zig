@@ -9,7 +9,11 @@ pub fn main() !void {
     var wm = try win.WM.init(allocator);
     defer wm.deinit();
 
-    var window = try wm.createWindow(.{ .title = "hello, world." });
+    var window = try wm.createWindow(
+        .{
+            .title = "hello, world.",
+        },
+    );
 
     var yellow_block: [5 * 5 * 4]u8 = undefined;
     var byte_index: usize = 0;
@@ -22,10 +26,11 @@ pub fn main() !void {
     const image = win.Image{
         .height = 5,
         .width = 5,
-        .rgba = &yellow_block,
+        .pixels = &yellow_block,
     };
 
     const image_id = try window.createImage(image);
+
     while (window.status == .open) {
         const event = try wm.receive();
         switch (event) {
