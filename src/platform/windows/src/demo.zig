@@ -188,10 +188,27 @@ pub fn windowProc(
             // select this bitmap on our frame_handle
             _ = win.SelectObject(frame_handle, bitmap);
         },
+        .WM_MOUSEMOVE => {
+            // probably wrong for multimonitor it seems
+            const x = win.loword(lparam);
+            const y = win.hiword(lparam);
+            log.debug("Mouse at {d}x{d}", .{ x, y });
+        },
+        .WM_LBUTTONDOWN => {
+            const x = win.loword(lparam);
+            const y = win.hiword(lparam);
+            log.debug("M1 down at {d}x{d}", .{ x, y });
+        },
+        .WM_MOUSEWHEEL => {
+            // TODO: https://learn.microsoft.com/pt-br/windows/win32/inputdev/wm-mousewheel
+        },
+        .WM_KEYDOWN => {
+            // TODO: https://learn.microsoft.com/pt-br/windows/win32/inputdev/wm-keydown
+        },
         else => {
             // let default proc handle other messages
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
         },
     }
-    return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
+    return 0;
 }

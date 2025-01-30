@@ -97,23 +97,9 @@ pub extern "user32" fn DefWindowProcW(
     lParam: isize,
 ) callconv(.C) isize;
 
-pub extern "user32" fn LoadCursorW(
-    instance: ?Instance,
-    cursor: CursorName,
-) callconv(.C) ?CursorHandler;
-
-pub extern "user32" fn ShowCursor(
-    show: bool,
-) callconv(.C) i32;
-
-pub extern "user32" fn SetCurso(
-    cursor: ?CursorHandler,
-) callconv(.C) ?CursorHandler;
-
 pub const WindowHandle = *anyopaque;
 pub const WindowClassAtom = u16;
 
-pub const CursorHandler = *anyopaque;
 pub const IconHandler = *anyopaque;
 pub const BrushHandler = *anyopaque;
 pub const MenuHandler = *anyopaque;
@@ -191,12 +177,59 @@ pub const Point = extern struct {
 };
 
 pub const MessageType = enum(u32) {
-    WM_CREATE = 1,
-    WM_DESTROY = 2,
-    WM_SIZE = 5,
-    WM_PAINT = 15,
+    WM_CREATE = 0x0001,
+    WM_DESTROY = 0x0002,
+    WM_SIZE = 0x0005,
+    WM_PAINT = 0x000F, //15,
+    WM_KEYDOWN = 0x0100,
+    WM_KEYUP = 0x0101,
+    WM_SYSKEYUP = 0x0105,
+    WM_SYSKEYDOWN = 0x0104,
+    WM_LBUTTONDOWN = 0x0201,
+    WM_LBUTTONUP = 0x0202,
+    WM_LBUTTONDBLCLK = 0x0203,
+    WM_RBUTTONDOWN = 0x0204,
+    WM_RBUTTONUP = 0x0205,
+    WM_RBUTTONDBLCLK = 0x0206,
+    WM_MBUTTONDOWN = 0x0207,
+    WM_MBUTTONUP = 0x0208,
+    WM_MBUTTONDBLCLK = 0x0209,
+    WM_MOUSEMOVE = 0x0200,
+    WM_MOUSEWHEEL = 0x020A,
+    WM_XBUTTONDOWN = 0x020B,
+    WM_XBUTTONUP = 0x020C,
+    WM_XBUTTONDBLCLK = 0x02D,
+    WM_MOUSEHWHEEL = 0x020E,
     _,
 };
+
+/// Used to check wParam from messages, as a mask(?).
+pub const ControlKeys = enum(u32) {
+    MK_LBUTTON = 0x0001,
+    MK_RBUTTON = 0x0002,
+    MK_SHIFT = 0x0004,
+    MK_CONTROL = 0x0008,
+    MK_MBUTTON = 0x0010,
+    MK_XBUTTON1 = 0x0020,
+    MK_XBUTTON2 = 0x0040,
+};
+
+// === Cursors
+
+pub extern "user32" fn LoadCursorW(
+    instance: ?Instance,
+    cursor: CursorName,
+) callconv(.C) ?CursorHandler;
+
+pub extern "user32" fn ShowCursor(
+    show: bool,
+) callconv(.C) i32;
+
+pub extern "user32" fn SetCursor(
+    cursor: ?CursorHandler,
+) callconv(.C) ?CursorHandler;
+
+pub const CursorHandler = *anyopaque;
 
 // === Drawing
 
