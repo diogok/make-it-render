@@ -1,23 +1,24 @@
 pub const WindowID = u32;
 pub const ImageID = u32;
+
 pub const Height = u16;
 pub const Width = u16;
 pub const X = i16;
 pub const Y = i16;
 
 pub const BBox = struct {
-    height: Height,
-    width: Width,
-    x: X,
-    y: Y,
+    height: Height = 0,
+    width: Width = 0,
+    x: X = 0,
+    y: Y = 0,
 };
 
 pub const WindowOptions = struct {
     title: []const u8 = "",
-    width: Width = 640,
-    height: Height = 480,
-    x: X = 10,
-    y: Y = 10,
+    width: ?Width = null,
+    height: ?Height = null,
+    x: ?X = null,
+    y: ?Y = null,
 };
 
 pub const WindowStatus = enum {

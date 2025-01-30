@@ -162,10 +162,10 @@ pub const X11Window = struct {
             .visual_id = wm.info.screens[0].root_visual,
             .depth = wm.info.screens[0].root_depth,
 
-            .x = options.x,
-            .y = options.y,
-            .width = options.width,
-            .height = options.height,
+            .x = options.x orelse 10,
+            .y = options.y orelse 10,
+            .width = options.width orelse 640,
+            .height = options.height orelse 480,
             .border_width = 0,
             .window_class = .InputOutput,
 

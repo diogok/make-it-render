@@ -69,10 +69,10 @@ pub const WindowsWindow = struct {
             wm.class_name,
             title,
             win.WindowStyle.OverlappedWindow,
-            win.UseDefault, // x
-            win.UseDefault, // y
-            win.UseDefault, // width
-            win.UseDefault, // height
+            options.x orelse win.UseDefault,
+            options.y orelse win.UseDefault,
+            options.width orelse win.UseDefault,
+            options.height orelse win.UseDefault,
             null,
             null,
             wm.instance,
@@ -82,7 +82,7 @@ pub const WindowsWindow = struct {
             return error.CreateWindowError;
         }
 
-        _ = win.ShowWindow(handle, 10);
+        _ = win.ShowWindow(handle, 1);
         while (win.ShowCursor(true) < 1) {}
 
         return @This(){
