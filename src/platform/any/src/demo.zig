@@ -1,12 +1,12 @@
 const std = @import("std");
-const ezwin = @import("ezwin");
+const win = @import("anywindow");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() != .leak);
     const allocator = gpa.allocator();
 
-    var wm = try ezwin.WM.init(allocator);
+    var wm = try win.WM.init(allocator);
     defer wm.deinit();
 
     var window = try wm.createWindow(.{ .title = "hello, world." });
@@ -19,7 +19,7 @@ pub fn main() !void {
         yellow_block[byte_index + 2] = 0; // blue
         yellow_block[byte_index + 3] = 0; // padding
     }
-    const image = ezwin.Image{
+    const image = win.Image{
         .height = 5,
         .width = 5,
         .rgba = &yellow_block,
@@ -33,7 +33,7 @@ pub fn main() !void {
                 try window.destroy();
             },
             .draw => {
-                const target = ezwin.BBox{
+                const target = win.BBox{
                     .x = 100,
                     .y = 100,
                     .height = 5,

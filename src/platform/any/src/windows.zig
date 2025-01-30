@@ -9,9 +9,10 @@ pub const WindowsWM = struct {
     class_name: win.String,
 
     pub fn init(allocator: std.mem.Allocator) !@This() {
-        const instance = win.GetModuleHandleExW(0, null, null);
+        const instance = win.GetModuleHandleW(null);
 
         const class_name = win.W2("WindowClass");
+        const cursor = win.LoadCursorW(null, .Arrow);
 
         const self = @This(){
             .allocator = allocator,
@@ -24,6 +25,7 @@ pub const WindowsWM = struct {
             .window_procedure = windowProc,
             .instance = instance,
             .class_name = class_name,
+            .cursor = cursor,
         };
 
         _ = win.RegisterClassExW(&window_class);
@@ -50,8 +52,8 @@ pub const WindowsWM = struct {
 };
 
 pub const WindowsWindow = struct {
-    handle: ?win.WindowHandle,
     wm: *WindowsWM,
+    handle: ?win.WindowHandle,
 
     title: [:0]u16,
 
@@ -76,6 +78,8 @@ pub const WindowsWindow = struct {
         );
 
         _ = win.ShowWindow(handle, 10);
+        while (win.ShowCursor(true) < 1) {}
+
         return @This(){
             .wm = wm,
             .handle = handle,

@@ -16,14 +16,14 @@ pub fn build(b: *std.Build) void {
     });
     const windows = windows_dep.module("windows");
 
-    const ezwin = b.addModule(
-        "ezwin",
+    const any = b.addModule(
+        "anywindow",
         .{
             .root_source_file = b.path("src/root.zig"),
         },
     );
-    ezwin.addImport("x11", x11);
-    ezwin.addImport("windows", windows);
+    any.addImport("x11", x11);
+    any.addImport("windows", windows);
 
     {
         const demo = b.addExecutable(.{
@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
             .link_libc = optimize == .Debug,
             .root_source_file = b.path("src/demo.zig"),
         });
-        demo.root_module.addImport("ezwin", ezwin);
+        demo.root_module.addImport("anywindow", any);
 
         b.installArtifact(demo);
 
@@ -45,7 +45,7 @@ pub fn build(b: *std.Build) void {
 
     {
         const tests = b.addTest(.{
-            .name = "ezwin",
+            .name = "anywindow",
             .target = target,
             .optimize = optimize,
             .root_source_file = b.path("src/root.zig"),
