@@ -41,7 +41,7 @@ pub extern "user32" fn CreateWindowExW(
     width: i32,
     height: i32,
     parent: ?WindowHandle,
-    menu: ?Menu,
+    menu: ?MenuHandler,
     instance: ?Instance,
     lpParam: ?*anyopaque,
 ) callconv(.C) ?WindowHandle;
@@ -97,13 +97,32 @@ pub extern "user32" fn DefWindowProcW(
     lParam: isize,
 ) callconv(.C) isize;
 
+pub extern "user32" fn LoadCursorW(
+    instance: ?Instance,
+    cursor: CursorName,
+) callconv(.C) ?CursorHandler;
+
+pub extern "user32" fn ShowCursor(
+    show: bool,
+) callconv(.C) i32;
+
+pub extern "user32" fn SetCurso(
+    cursor: ?CursorHandler,
+) callconv(.C) ?CursorHandler;
+
 pub const WindowHandle = *anyopaque;
 pub const WindowClassAtom = u16;
 
-pub const Icon = *anyopaque;
-pub const Cursor = *anyopaque;
-pub const Brush = *anyopaque;
-pub const Menu = *anyopaque;
+pub const CursorHandler = *anyopaque;
+pub const IconHandler = *anyopaque;
+pub const BrushHandler = *anyopaque;
+pub const MenuHandler = *anyopaque;
+
+pub const CursorName = enum(u32) {
+    Arrow = 32512,
+    Beam = 32513,
+    Wait = 32514,
+};
 
 pub const WindowClass = extern struct {
     size: u32 = @sizeOf(@This()),
@@ -112,12 +131,12 @@ pub const WindowClass = extern struct {
     class_extra: i32 = 0,
     window_extra: i32 = 0,
     instance: ?Instance,
-    icon: ?Icon = null,
-    cursor: ?Cursor = null,
-    background: ?Brush = null,
+    icon: ?IconHandler = null,
+    cursor: ?CursorHandler = null,
+    background: ?BrushHandler = null,
     menu_name: ?String = null,
     class_name: ?String,
-    icon_small: ?Icon = null,
+    icon_small: ?IconHandler = null,
 };
 
 pub const ExtendedWindowStyle = enum(u32) {
@@ -172,6 +191,7 @@ pub const Point = extern struct {
 };
 
 pub const MessageType = enum(u32) {
+    WM_CREATE = 1,
     WM_DESTROY = 2,
     WM_SIZE = 5,
     WM_PAINT = 15,

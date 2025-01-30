@@ -21,12 +21,19 @@ pub fn main() !void {
 
     const title = win.W2("Hello world!"); // For string literals, comptime known
 
+    const cursor = win.LoadCursorW(null, .Arrow);
+    if (cursor == null) {
+        const err = win.GetLastError();
+        log.err("LoadCursor error: {any}", .{err});
+    }
+
     // Configure our windows class with typical options
     var window_class: win.WindowClass = .{
         .style = @intFromEnum(win.ClassStyle.HREDRAW) | @intFromEnum(win.ClassStyle.VREDRAW),
         .window_procedure = windowProc,
         .instance = instance,
         .class_name = class_name,
+        .cursor = cursor,
     };
 
     // Register the class to use later to create the window.
@@ -70,6 +77,8 @@ pub fn main() !void {
         return error.ShowWindowError;
     }
 
+    while (win.ShowCursor(true) < 1) {}
+
     // Request the first window update, not really needed.
     _ = win.UpdateWindow(window_handle);
 
@@ -97,10 +106,12 @@ pub fn windowProc(
     lparam: isize,
 ) callconv(.C) isize {
     switch (message_type) {
+        .WM_CREATE => {},
         .WM_DESTROY => {
             win.PostQuitMessage(0);
         },
         .WM_PAINT => {
+            while (win.ShowCursor(true) < 1) {}
             // The paint struct will receive paint specs from BeginPaint.
             var paint = std.mem.zeroes(win.Paint);
             // BeginPain will fill in Paint struct and give us somewhere to draw to.
@@ -110,6 +121,7 @@ pub fn windowProc(
                 log.err("Beginpaint error: {any}", .{err});
                 return 0;
             }
+            defer _ = win.EndPaint(window_handle, &paint);
 
             // Paint it red.
             // BGRA
@@ -140,7 +152,6 @@ pub fn windowProc(
                 return 0;
             }
 
-            _ = win.EndPaint(window_handle, &paint);
             _ = win.DwmFlush(); // wait for vsync, kinda
         },
         .WM_SIZE => {
@@ -182,5 +193,5 @@ pub fn windowProc(
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
         },
     }
-    return 0;
+    return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
 }
