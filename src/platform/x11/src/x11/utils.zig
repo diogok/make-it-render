@@ -24,7 +24,7 @@ test "mask" {}
 /// Based of values you will pass.
 pub fn maskFromValues(comptime MaskType: type, values: anytype) u32 {
     var value_mask: u32 = 0;
-    inline for (@typeInfo(@TypeOf(values)).Struct.fields) |field| {
+    inline for (@typeInfo(@TypeOf(values)).@"struct".fields) |field| {
         const value = @field(values, field.name);
         if (value) |_| {
             value_mask |= @intFromEnum(@field(MaskType, field.name));
@@ -43,13 +43,13 @@ test "mask from values" {
     try testing.expectEqual(expected, result);
 }
 
-fn bufferFor(MaskType: type) [@typeInfo(MaskType).Struct.fields.len * 4]u8 {
+fn bufferFor(MaskType: type) [@typeInfo(MaskType).@"struct".fields.len * 4]u8 {
     return undefined;
 }
 
 fn bytesFromValues(buffer: []u8, values: anytype) []const u8 {
     var bytes_len: usize = 0;
-    inline for (@typeInfo(@TypeOf(values)).Struct.fields) |field| {
+    inline for (@typeInfo(@TypeOf(values)).@"struct".fields) |field| {
         const value = @field(values, field.name);
         if (value) |v| {
             std.mem.copyForwards(u8, buffer[bytes_len..], std.mem.asBytes(&v));

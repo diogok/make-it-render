@@ -16,7 +16,7 @@ pub const ConnectionOptions = struct {
 /// Connects to local X11 server.
 /// It will look for DISPLAY env variable, or default to :0.
 pub fn connect(options: ConnectionOptions) !std.net.Stream {
-    var buffer: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+    var buffer: [std.fs.max_path_bytes]u8 = undefined;
     const socket_path = try get_socket_path(&buffer);
 
     log.debug("Socket path: {s}", .{socket_path});
@@ -57,8 +57,8 @@ fn get_socket_path(buffer: []u8) ![]const u8 {
 fn setTimeout(socket: os.socket_t, read_timeout: i32, write_timeout: i32) !void {
     if (read_timeout > 0) {
         var timeout: os.timeval = undefined;
-        timeout.tv_sec = @as(c_long, @intCast(@divTrunc(read_timeout, 1000000)));
-        timeout.tv_usec = @as(c_long, @intCast(@mod(read_timeout, 1000000)));
+        timeout.sec = @as(c_long, @intCast(@divTrunc(read_timeout, 1000000)));
+        timeout.usec = @as(c_long, @intCast(@mod(read_timeout, 1000000)));
         try os.setsockopt(
             socket,
             os.SOL.SOCKET,
@@ -69,8 +69,8 @@ fn setTimeout(socket: os.socket_t, read_timeout: i32, write_timeout: i32) !void 
 
     if (write_timeout > 0) {
         var timeout: os.timeval = undefined;
-        timeout.tv_sec = @as(c_long, @intCast(@divTrunc(write_timeout, 1000000)));
-        timeout.tv_usec = @as(c_long, @intCast(@mod(write_timeout, 1000000)));
+        timeout.sec = @as(c_long, @intCast(@divTrunc(write_timeout, 1000000)));
+        timeout.usec = @as(c_long, @intCast(@mod(write_timeout, 1000000)));
         try os.setsockopt(
             socket,
             os.SOL.SOCKET,
