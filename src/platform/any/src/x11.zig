@@ -236,7 +236,7 @@ pub const X11Window = struct {
         };
         try x11.send(self.wm.conn, pixmap_req);
 
-        const zpixmap = try x11.rgbaToZPixmapAlloc(self.wm.allocator, image_info, image.rgba);
+        const zpixmap = try x11.rgbaToZPixmapAlloc(self.wm.allocator, image_info, image.pixels);
         defer self.wm.allocator.free(zpixmap);
 
         const put_image_req = x11.PutImage{
