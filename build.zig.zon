@@ -1,7 +1,13 @@
 .{
-	.name = "z11",
+	.name = .makeitrender,
+        .fingerprint = 0x919cae7cda72fa6a,
 	.version = "0.0.0",
-	.paths =  .{"src"},
+	.paths =  .{
+		"src"
+	},
 	.dependencies =.{
+            .anywindow = .{
+                .path = "src/platform/any",
+            },
 	},
 }
