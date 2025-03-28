@@ -1,4 +1,5 @@
-.swp
 .zig-cache
 zig-out
 target
+*~
+*.swp

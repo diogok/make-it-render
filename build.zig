@@ -4,52 +4,27 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    switch (target.result.os.tag) {
-        .linux => {
-            {
-                const x11 = b.anonymousDependency("src/windows/x11", @import("src/windows/x11/build.zig"), .{
-                    .target = target,
-                    .optimize = optimize,
-                });
+    const anywindow_dep = b.dependency("anywindow", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const anywindow = anywindow_dep.module("anywindow");
 
-                const exe = x11.artifact("demo");
-                b.installArtifact(exe);
+    {
+        const demo = b.addExecutable(.{
+            .name = "demo",
+            .target = target,
+            .optimize = optimize,
+            .strip = optimize == .ReleaseSmall,
+            .link_libc = optimize == .Debug,
+            .root_source_file = b.path("src/demo.zig"),
+        });
+        demo.root_module.addImport("anywindow", anywindow);
 
-                const run_cmd = b.addRunArtifact(exe);
-                const run_step = b.step("run-demo-x11", "Run X11 demo");
-                run_step.dependOn(&run_cmd.step);
-            }
-        },
-        .windows => {
-            {
-                const windows = b.anonymousDependency("src/windows/windows", @import("src/windows/windows/build.zig"), .{
-                    .target = target,
-                    .optimize = optimize,
-                });
+        b.installArtifact(demo);
 
-                const exe = windows.artifact("demo");
-                b.installArtifact(exe);
-
-                const run_cmd = b.addRunArtifact(exe);
-                const run_step = b.step("run-demo-windows", "Run windows demo");
-                run_step.dependOn(&run_cmd.step);
-            }
-        },
-        .macos => {
-            {
-                const mac = b.anonymousDependency("src/windows/macosx", @import("src/windows/macosx/build.zig"), .{
-                    .target = target,
-                    .optimize = optimize,
-                });
-
-                const exe = mac.artifact("demo");
-                b.installArtifact(exe);
-
-                const run_cmd = b.addRunArtifact(exe);
-                const run_step = b.step("run-demo-mac", "Run mac demo");
-                run_step.dependOn(&run_cmd.step);
-            }
-        },
-        else => {},
+        const run_cmd = b.addRunArtifact(demo);
+        const run_step = b.step("run", "Run demo");
+        run_step.dependOn(&run_cmd.step);
     }
 }
