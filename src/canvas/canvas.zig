@@ -17,7 +17,7 @@ pub const RGBA = packed struct {
     red: u8 = 0,
     green: u8 = 0,
     blue: u8 = 0,
-    alpha: u8 = 1,
+    alpha: u8 = 0,
 };
 
 // TODO: Dynamic, growing, tiled ImageData?

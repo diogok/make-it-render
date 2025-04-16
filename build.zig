@@ -10,6 +10,13 @@ pub fn build(b: *std.Build) void {
     });
     const anywindow = anywindow_dep.module("anywindow");
 
+    const fonts_dep = b.dependency("fonts", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const fonts = fonts_dep.module("fonts");
+    const fontz = fonts_dep.module("fontz");
+
     {
         const demo = b.addExecutable(.{
             .name = "demo",
@@ -19,7 +26,10 @@ pub fn build(b: *std.Build) void {
             .link_libc = optimize == .Debug,
             .root_source_file = b.path("src/demo.zig"),
         });
+
         demo.root_module.addImport("anywindow", anywindow);
+        demo.root_module.addImport("fonts", fonts);
+        demo.root_module.addImport("fontz", fontz);
 
         b.installArtifact(demo);
 

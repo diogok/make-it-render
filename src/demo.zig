@@ -1,9 +1,12 @@
 const std = @import("std");
+
 const win = @import("anywindow");
+const fonts = @import("fonts");
+//const text = @import("text/text.zig");
 
 pub const std_options: std.Options = .{
     .log_scope_levels = &[_]std.log.ScopeLevel{
-        .{.scope = .x11, .level = .warn},
+        .{ .scope = .x11, .level = .warn },
     },
 };
 
@@ -37,6 +40,9 @@ pub fn main() !void {
 
     const image_id = try window.createImage(image);
 
+    const font = try fonts.terminus.getFont(allocator, 16, .regular);
+    defer font.deinit();
+
     while (window.status == .open) {
         const event = try wm.receive();
         switch (event) {
@@ -44,6 +50,10 @@ pub fn main() !void {
                 try window.destroy();
             },
             .draw => {
+                // get canvas box
+                // draw into pixmap
+                // invalidate rect
+                // copy
                 const target = win.BBox{
                     .x = 100,
                     .y = 100,

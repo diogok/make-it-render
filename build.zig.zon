@@ -9,5 +9,8 @@
             .anywindow = .{
                 .path = "src/platform/any",
             },
+            .fonts = .{
+                .path = "src/fonts",
+            },
 	},
 }
