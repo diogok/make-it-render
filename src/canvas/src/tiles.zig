@@ -3,9 +3,6 @@ const testing = std.testing;
 
 const types = @import("types.zig");
 
-pub const DefaultTileHeight: types.Height = 64;
-pub const DefaultTileWidth: types.Width = 64;
-
 pub const Tile = struct {
     allocator: std.mem.Allocator,
 
@@ -15,21 +12,15 @@ pub const Tile = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        width: types.Width,
-        height: types.Height,
-        origin: types.Point,
+        area: types.BBox,
     ) !@This() {
-        const pixels = try allocator.alloc(types.RGBA, width * height);
+        const pixels = try allocator.alloc(types.RGBA, area.size.width * area.size.height);
         for (pixels, 0..) |_, i| {
             pixels[i] = std.mem.zeroes(types.RGBA);
         }
         return @This(){
             .allocator = allocator,
-            .area = .{
-                .origin = origin,
-                .height = height,
-                .width = width,
-            },
+            .area = area,
             .pixels = pixels,
         };
     }
@@ -58,13 +49,34 @@ pub const Tile = struct {
 
     fn setPixel(self: @This(), point: types.Point, color: types.RGBA) void {
         const fixed_point = self.area.internalPoint(point);
-        const index = types.indexFromPoint(self.area.width, fixed_point);
+        const index = indexFromPoint(self.area.size.width, fixed_point);
         self.pixels[index] = color;
     }
 };
 
+fn indexFromPoint(width: types.Width, point: types.Point) usize {
+    return point.y * width + point.x;
+}
+
+test "find index from point" {
+    try testing.expectEqual(0, indexFromPoint(25, .{ .x = 0, .y = 0 }));
+    try testing.expectEqual(1, indexFromPoint(25, .{ .x = 1, .y = 0 }));
+    try testing.expectEqual(25, indexFromPoint(25, .{ .x = 0, .y = 1 }));
+    try testing.expectEqual(26, indexFromPoint(25, .{ .x = 1, .y = 1 }));
+    try testing.expectEqual(624, indexFromPoint(25, .{ .x = 24, .y = 24 }));
+}
 test "Basic tiles" {
-    const tile0 = try Tile.init(testing.allocator, 5, 5, .{ .x = 0, .y = 0 });
+    const bbox = types.BBox{
+        .size = .{
+            .width = 5,
+            .height = 5,
+        },
+        .origin = .{
+            .x = 0,
+            .y = 0,
+        },
+    };
+    const tile0 = try Tile.init(testing.allocator, bbox);
     defer tile0.deinit();
 
     try testing.expect(tile0.maybeSetPixel(.{ .x = 1, .y = 1 }, .{ .red = 10 }));
@@ -84,7 +96,17 @@ test "Basic tiles" {
 }
 
 test "Basic tiles 2" {
-    const tile0 = try Tile.init(testing.allocator, 5, 5, .{ .x = 5, .y = 5 });
+    const bbox = types.BBox{
+        .size = .{
+            .width = 5,
+            .height = 5,
+        },
+        .origin = .{
+            .x = 5,
+            .y = 5,
+        },
+    };
+    const tile0 = try Tile.init(testing.allocator, bbox);
     defer tile0.deinit();
 
     try testing.expect(!tile0.maybeSetPixel(.{ .x = 1, .y = 1 }, .{ .red = 10 }));
@@ -109,22 +131,14 @@ pub const TileList = std.ArrayList(Tile);
 
 pub const TileMap = struct {
     allocator: std.mem.Allocator,
-
-    tileHeight: types.Height,
-    tileWidth: types.Width,
-
+    tileSize: types.Size,
     tiles: TileList,
 
-    pub fn initDefault(allocator: std.mem.Allocator) @This() {
-        return @This().init(allocator, DefaultTileWidth, DefaultTileHeight);
-    }
-
-    pub fn init(allocator: std.mem.Allocator, width: types.Width, height: types.Height) @This() {
+    pub fn init(allocator: std.mem.Allocator, tileSize: types.Size) @This() {
         return @This(){
             .allocator = allocator,
             .tiles = TileList.init(allocator),
-            .tileHeight = height,
-            .tileWidth = width,
+            .tileSize = tileSize,
         };
     }
 
@@ -143,7 +157,8 @@ pub const TileMap = struct {
         }
 
         const origin = self.tileOriginForPoint(point);
-        const tile = try Tile.init(self.allocator, self.tileHeight, self.tileWidth, origin);
+        const bbox = types.BBox{ .size = self.tileSize, .origin = origin };
+        const tile = try Tile.init(self.allocator, bbox);
         tile.setPixel(point, color);
 
         try self.tiles.append(tile);
@@ -157,11 +172,11 @@ pub const TileMap = struct {
     }
 
     fn tileOriginForPoint(self: *@This(), point: types.Point) types.Point {
-        const a = @divFloor(point.x, self.tileHeight);
-        const x = (a * self.tileHeight);
+        const a = @divFloor(point.x, self.tileSize.height);
+        const x = (a * self.tileSize.height);
 
-        const b = @divFloor(point.y, self.tileWidth);
-        const y = (b * self.tileWidth);
+        const b = @divFloor(point.y, self.tileSize.width);
+        const y = (b * self.tileSize.width);
 
         return types.Point{
             .x = x,
@@ -171,7 +186,7 @@ pub const TileMap = struct {
 };
 
 test "find origin" {
-    var tiles = TileMap.init(testing.allocator, 5, 5);
+    var tiles = TileMap.init(testing.allocator, .{ .width = 5, .height = 5 });
     defer tiles.deinit();
 
     const p0 = tiles.tileOriginForPoint(.{ .x = 0, .y = 0 });
@@ -214,7 +229,7 @@ pub const TileAreaIterator = struct {
 };
 
 test "Basic tile map" {
-    var tiles = TileMap.init(testing.allocator, 5, 5);
+    var tiles = TileMap.init(testing.allocator, .{ .width = 5, .height = 5 });
     defer tiles.deinit();
 
     try tiles.setPixel(.{ .x = 1, .y = 1 }, .{ .red = 99 });
@@ -222,8 +237,10 @@ test "Basic tile map" {
 
     var iter = tiles.areaIterator(.{
         .origin = .{ .x = 2, .y = 2 },
-        .height = 100,
-        .width = 100,
+        .size = .{
+            .height = 100,
+            .width = 100,
+        },
     });
 
     const expected0 = &[_]types.RGBA{

@@ -19,10 +19,19 @@ pub const X = u16;
 // X represents horizontal coordinates
 pub const Y = u16;
 
-pub const BBox = struct {
-    origin: Point,
+pub const Point = packed struct {
+    x: X,
+    y: Y,
+};
+
+pub const Size = packed struct {
     height: Height,
     width: Width,
+};
+
+pub const BBox = struct {
+    origin: Point,
+    size: Size,
 
     pub fn containsPoint(self: @This(), point: Point) bool {
         return point.x >= self.origin.x and
@@ -32,18 +41,18 @@ pub const BBox = struct {
     }
 
     pub fn maxY(self: @This()) Y {
-        return self.origin.y + self.height;
+        return self.origin.y + self.size.height;
     }
 
     pub fn maxX(self: @This()) X {
-        return self.origin.x + self.width;
+        return self.origin.x + self.size.width;
     }
     pub fn maxHeight(self: @This()) Height {
-        return self.origin.y + self.height;
+        return self.origin.y + self.size.height;
     }
 
     pub fn maxWidth(self: @This()) Width {
-        return self.origin.x + self.width;
+        return self.origin.x + self.size.width;
     }
 
     pub fn internalPoint(self: @This(), point: Point) Point {
@@ -67,14 +76,16 @@ test "box overlaps" {
             .x = 2,
             .y = 2,
         },
-        .height = 25,
-        .width = 25,
+        .size = .{
+            .height = 25,
+            .width = 25,
+        },
     };
 
-    try testing.expect(bbox0.overlaps(.{ .origin = .{ .x = 0, .y = 0 }, .height = 50, .width = 50 }));
-    try testing.expect(bbox0.overlaps(.{ .origin = .{ .x = 0, .y = 0 }, .height = 5, .width = 50 }));
-    try testing.expect(bbox0.overlaps(.{ .origin = .{ .x = 20, .y = 20 }, .height = 5, .width = 50 }));
-    try testing.expect(!bbox0.overlaps(.{ .origin = .{ .x = 28, .y = 28 }, .height = 5, .width = 5 }));
+    try testing.expect(bbox0.overlaps(.{ .origin = .{ .x = 0, .y = 0 }, .size = .{ .height = 50, .width = 50 } }));
+    try testing.expect(bbox0.overlaps(.{ .origin = .{ .x = 0, .y = 0 }, .size = .{ .height = 5, .width = 50 } }));
+    try testing.expect(bbox0.overlaps(.{ .origin = .{ .x = 20, .y = 20 }, .size = .{ .height = 5, .width = 50 } }));
+    try testing.expect(!bbox0.overlaps(.{ .origin = .{ .x = 28, .y = 28 }, .size = .{ .height = 5, .width = 5 } }));
 }
 
 test "bbx internal point" {
@@ -83,8 +94,10 @@ test "bbx internal point" {
             .x = 0,
             .y = 0,
         },
-        .height = 25,
-        .width = 25,
+        .size = .{
+            .height = 25,
+            .width = 25,
+        },
     };
 
     const point0A = bbox0.internalPoint(.{ .x = 0, .y = 0 });
@@ -100,8 +113,10 @@ test "bbx internal point" {
             .x = 25,
             .y = 25,
         },
-        .height = 25,
-        .width = 25,
+        .size = .{
+            .height = 25,
+            .width = 25,
+        },
     };
 
     const point1A = bbox1.internalPoint(.{ .x = 25, .y = 25 });
@@ -123,8 +138,10 @@ test "bbox contains point" {
             .x = 0,
             .y = 0,
         },
-        .height = 25,
-        .width = 25,
+        .size = .{
+            .height = 25,
+            .width = 25,
+        },
     };
 
     try testing.expect(bbox0.containsPoint(.{ .x = 0, .y = 0 }));
@@ -142,8 +159,10 @@ test "bbox contains point" {
             .x = 25,
             .y = 25,
         },
-        .height = 25,
-        .width = 25,
+        .size = .{
+            .height = 25,
+            .width = 25,
+        },
     };
 
     try testing.expect(!bbox1.containsPoint(.{ .x = 0, .y = 0 }));
@@ -160,21 +179,4 @@ test "bbox contains point" {
     try testing.expect(bbox1.containsPoint(.{ .x = 49, .y = 49 }));
 
     try testing.expect(!bbox1.containsPoint(.{ .x = 50, .y = 50 }));
-}
-
-pub const Point = packed struct {
-    x: X,
-    y: Y,
-};
-
-pub fn indexFromPoint(width: Width, point: Point) usize {
-    return point.y * width + point.x;
-}
-
-test "find index from point" {
-    try testing.expectEqual(0, indexFromPoint(25, .{ .x = 0, .y = 0 }));
-    try testing.expectEqual(1, indexFromPoint(25, .{ .x = 1, .y = 0 }));
-    try testing.expectEqual(25, indexFromPoint(25, .{ .x = 0, .y = 1 }));
-    try testing.expectEqual(26, indexFromPoint(25, .{ .x = 1, .y = 1 }));
-    try testing.expectEqual(624, indexFromPoint(25, .{ .x = 24, .y = 24 }));
 }
