@@ -1,7 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 
-const fontz = @import("formats/common.zig");
+const fontz = @import("fonts/formats/common.zig");
 const terminus = @import("fonts/terminus.zig");
 
 pub const Mask = struct {
