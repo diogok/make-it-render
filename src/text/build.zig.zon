@@ -1,0 +1,10 @@
+.{
+    .name = .text,
+    .fingerprint = 0,
+    .version = "0.1.0",
+    .dependencies = .{
+        .fonts = .{
+        .path = "../fonts",
+        },
+    },
+}
