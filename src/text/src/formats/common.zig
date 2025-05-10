@@ -32,4 +32,8 @@ pub const Font = struct {
     pub fn get(self: *@This(), codepoint: u21) ?Glyph {
         return self.glyphs.get(codepoint);
     }
+
+    pub fn getOrBlank(self: *@This(), codepoint: u21) Glyph {
+        return self.glyphs.get(codepoint) or self.glyphs.get(0).?;
+    }
 };

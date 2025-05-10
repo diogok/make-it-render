@@ -65,6 +65,7 @@ test "find index from point" {
     try testing.expectEqual(26, indexFromPoint(25, .{ .x = 1, .y = 1 }));
     try testing.expectEqual(624, indexFromPoint(25, .{ .x = 24, .y = 24 }));
 }
+
 test "Basic tiles" {
     const bbox = types.BBox{
         .size = .{
