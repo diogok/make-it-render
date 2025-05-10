@@ -1,5 +1,6 @@
 .{
-    .name = "fontz",
+    .name = .text,
+    .fingerprint = 0x3b8ba7c7224682f5,
     .version = "0.0.0",
     .paths = .{ "src", "fonts" },
     .dependencies = .{},

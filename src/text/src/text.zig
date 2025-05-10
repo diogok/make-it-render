@@ -1,5 +1,8 @@
 const std = @import("std");
-const fontz = @import("fontz");
+const testing = std.testing;
+
+const fontz = @import("formats/common.zig");
+const terminus = @import("fonts/terminus.zig");
 
 pub const Mask = struct {
     width: u16,
@@ -30,4 +33,11 @@ pub fn render(allocator: std.mem.Allocator, font: fontz.Font, text: []const u8) 
     }
 
     return Mask{ .width = width, .bitmap = bitmap };
+}
+
+test "basic mask" {
+    const font = terminus.getFont(testing.allocator, .@"32", .normal);
+    defer font.deinit();
+    const mask = try render(testing.allocator, font, "hello, world");
+    defer testing.allocator.free(mask.bitmap);
 }

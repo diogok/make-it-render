@@ -1,7 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 
-const fontz = @import("fontz");
+const text = @import("text");
 
 const terminus_tar_gz = @embedFile("terminus.tar.gz");
 
@@ -22,7 +22,7 @@ pub const Size = enum(u8) {
     @"32" = 32,
 };
 
-pub fn getFont(allocator: std.mem.Allocator, size: Size, weight: Weight) !fontz.Font {
+pub fn getFont(allocator: std.mem.Allocator, size: Size, weight: Weight) !text.Font {
     var target_buffer: [13]u8 = undefined;
     const target_file = try std.fmt.bufPrint(&target_buffer, "ter-u{d}{c}.bdf", .{ @intFromEnum(size), @intFromEnum(weight) });
 
@@ -39,7 +39,7 @@ pub fn getFont(allocator: std.mem.Allocator, size: Size, weight: Weight) !fontz.
     while (try tar_iter.next()) |file| {
         if (std.mem.eql(u8, target_file, file.name)) {
             var file_reader = file.reader();
-            return try fontz.bdf.parse(allocator, &file_reader);
+            return try text.bdf.parse(allocator, &file_reader);
         }
     }
 
