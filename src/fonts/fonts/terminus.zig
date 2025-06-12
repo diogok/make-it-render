@@ -50,6 +50,34 @@ test "get a font" {
     var font = try getFont(testing.allocator, .@"12", .normal);
     defer font.deinit();
 
+    const lowercaseA = font.get('a');
+    try testing.expect(lowercaseA != null);
+
+    const a = lowercaseA.?;
+    try testing.expectEqual(6, a.bbox.width);
+    try testing.expectEqual(12, a.bbox.height);
+
+    const bitmap = &[_]u1{
+        0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+        0, 1, 1, 1, 0, 0,
+        0, 0, 0, 0, 1, 0,
+        0, 1, 1, 1, 1, 0,
+        1, 0, 0, 0, 1, 0,
+        1, 0, 0, 0, 1, 0,
+        0, 1, 1, 1, 1, 0,
+        0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+    };
+    try testing.expectEqualSlices(u1, bitmap, a.bitmap);
+}
+
+test "get a font 32" {
+    var font = try getFont(testing.allocator, .@"32", .normal);
+    defer font.deinit();
+
     const A = font.get('a');
     try testing.expect(A != null);
 }

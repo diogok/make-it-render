@@ -20,7 +20,9 @@ pub fn parse(allocator: std.mem.Allocator, reader: anytype) !common.Font {
     while (true) {
         const token = try tokens.next();
         switch (token.type) {
-            .char_start => {},
+            .char_start => {
+                glyph = std.mem.zeroes(common.Glyph);
+            },
             .char_key => {
                 if (std.mem.eql(u8, "ENCODING", token.value)) {
                     prop = .encoding;
@@ -52,16 +54,16 @@ pub fn parse(allocator: std.mem.Allocator, reader: anytype) !common.Font {
                 }
             },
             .bitmap_start => {
-                glyph.bitmap = try allocator.alloc(u1, glyph.bbox.width * glyph.bbox.height);
+                const size: usize = @as(u16, glyph.bbox.width) * @as(u16, glyph.bbox.height);
+                glyph.bitmap = try allocator.alloc(u1, size);
                 bitmap_pos = 0;
             },
             .bitmap_value => {
                 var buf: [32]u8 = undefined;
                 const bytes = try std.fmt.hexToBytes(&buf, token.value);
-                // TODO: just save the bytes, I think.
                 var i: u8 = 0;
                 while (i < glyph.bbox.width) : (i += 1) {
-                    const bit = std.mem.readPackedInt(u1, bytes, i, builtin.cpu.arch.endian());
+                    const bit = std.mem.readPackedInt(u1, bytes, bytes.len * 8 - i - 1, builtin.cpu.arch.endian());
                     glyph.bitmap[bitmap_pos] = bit;
                     bitmap_pos += 1;
                 }
@@ -110,11 +112,9 @@ test "parse" {
     const ABitmap = &[8 * 16]u1{
         0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 1, 1, 0, 0, 0,
-        0, 0, 1, 0, 0, 1, 0, 0,
-        0, 0, 1, 0, 0, 1, 0, 0,
+        0, 0, 1, 1, 1, 1, 0, 0,
+        0, 1, 0, 0, 0, 0, 1, 0,
+        0, 1, 0, 0, 0, 0, 1, 0,
         0, 1, 0, 0, 0, 0, 1, 0,
         0, 1, 0, 0, 0, 0, 1, 0,
         0, 1, 1, 1, 1, 1, 1, 0,
@@ -122,6 +122,8 @@ test "parse" {
         0, 1, 0, 0, 0, 0, 1, 0,
         0, 1, 0, 0, 0, 0, 1, 0,
         0, 1, 0, 0, 0, 0, 1, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0,
     };
@@ -435,11 +437,9 @@ const example =
     \\BITMAP
     \\00
     \\00
-    \\00
-    \\00
-    \\18
-    \\24
-    \\24
+    \\3C
+    \\42
+    \\42
     \\42
     \\42
     \\7E
@@ -447,6 +447,8 @@ const example =
     \\42
     \\42
     \\42
+    \\00
+    \\00
     \\00
     \\00
     \\ENDCHAR

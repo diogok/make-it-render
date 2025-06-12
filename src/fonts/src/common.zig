@@ -15,7 +15,7 @@ pub const Glyph = struct {
     bbox: BBox,
 };
 
-pub const GlyphMap = std.AutoHashMapUnmanaged(u32, Glyph);
+pub const GlyphMap = std.AutoHashMapUnmanaged(u21, Glyph);
 
 pub const Font = struct {
     allocator: std.mem.Allocator,
@@ -34,6 +34,9 @@ pub const Font = struct {
     }
 
     pub fn getOrBlank(self: *@This(), codepoint: u21) Glyph {
-        return self.glyphs.get(codepoint) or self.glyphs.get(0).?;
+        if (self.glyphs.get(codepoint)) |glyph| {
+            return glyph;
+        }
+        return self.glyphs.get(0).?;
     }
 };
