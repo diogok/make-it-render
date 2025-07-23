@@ -1,6 +1,4 @@
+
 # Make it render
 
-Hopefully all you need to render something on the screen.
-
-
-
+Glue code and abstraction between X11, Windows and MacOS windows handling.
