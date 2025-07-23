@@ -1,7 +1,0 @@
-.{
-    .name = .fonts,
-    .fingerprint = 0x7303e8fb42a8db29,
-    .version = "0.0.0",
-    .paths = .{ "src", "fonts" },
-    .dependencies = .{},
-}
