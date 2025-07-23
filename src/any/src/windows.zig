@@ -251,60 +251,119 @@ pub fn windowProc(
     wparam: usize,
     lparam: isize,
 ) callconv(.C) isize {
+    const windowID = @intFromPtr(window_handle);
     switch (message_type) {
         .WM_DESTROY => {
             active = 1;
-
-            event[active].close = window_handle;
+            event[active].close = windowID;
         },
         .WM_PAINT => {
             active = 2;
         },
-        .WM_XBUTTONDOWN => {
+        .WM_LBUTTONDOWN => {
             active = 3;
 
             const x = win.loword(lparam);
             const y = win.hiword(lparam);
 
-            event[active].key_pressed.x = x;
-            event[active].key_pressed.y = y;
+            event[active].mouse_pressed.x = @intCast(x);
+            event[active].mouse_pressed.y = @intCast(y);
 
-            event[active].key_pressed.window_id = window_handle;
+            event[active].mouse_pressed.button = 1;
+
+            event[active].mouse_pressed.window_id = windowID;
+            return 1;
         },
-        .WM_XBUTTONUP => {
+        .WM_LBUTTONUP => {
             active = 4;
 
             const x = win.loword(lparam);
             const y = win.hiword(lparam);
 
-            event[active].key_released.x = x;
-            event[active].key_released.y = y;
+            event[active].mouse_released.x = @intCast(x);
+            event[active].mouse_released.y = @intCast(y);
 
-            event[active].key_pressed.window_id = window_handle;
+            event[active].mouse_released.button = 1;
+
+            event[active].mouse_released.window_id = windowID;
+        },
+        .WM_MBUTTONDOWN => {
+            active = 3;
+
+            const x = win.loword(lparam);
+            const y = win.hiword(lparam);
+
+            event[active].mouse_pressed.x = @intCast(x);
+            event[active].mouse_pressed.y = @intCast(y);
+
+            event[active].mouse_pressed.button = 2;
+
+            event[active].mouse_pressed.window_id = windowID;
+        },
+        .WM_MBUTTONUP => {
+            active = 4;
+
+            const x = win.loword(lparam);
+            const y = win.hiword(lparam);
+
+            event[active].mouse_released.x = @intCast(x);
+            event[active].mouse_released.y = @intCast(y);
+
+            event[active].mouse_released.button = 2;
+
+            event[active].mouse_released.window_id = windowID;
+            return 1;
+        },
+        .WM_RBUTTONDOWN => {
+            active = 3;
+
+            const x = win.loword(lparam);
+            const y = win.hiword(lparam);
+
+            event[active].mouse_pressed.x = @intCast(x);
+            event[active].mouse_pressed.y = @intCast(y);
+
+            event[active].mouse_pressed.button = 3;
+
+            event[active].mouse_pressed.window_id = windowID;
+        },
+        .WM_RBUTTONUP => {
+            active = 4;
+
+            const x = win.loword(lparam);
+            const y = win.hiword(lparam);
+
+            event[active].mouse_released.x = @intCast(x);
+            event[active].mouse_released.y = @intCast(y);
+
+            event[active].mouse_released.button = 3;
+
+            event[active].mouse_released.window_id = windowID;
+            return 1;
         },
         .WM_MOUSEMOVE => {
             active = 5;
 
-            event[active].mouse_moved.window_id = window_handle;
+            event[active].mouse_moved.window_id = windowID;
         },
         .WM_KEYDOWN => {
             active = 6;
 
-            const key: win.VirtualKeys = @enumFromInt((wparam));
-            event[active].key_pressed.key = key;
+            //const key: win.VirtualKeys = @enumFromInt(wparam);
+            //event[active].key_pressed.key = @enumFr;
 
-            event[active].key_pressed.window_id = window_handle;
+            event[active].key_pressed.window_id = windowID;
         },
         .WM_KEYUP => {
             active = 7;
 
-            const key: win.VirtualKeys = @enumFromInt((wparam));
-            event[active].key_released.key = key;
+            //const key: win.VirtualKeys = @enumFromInt(wparam);
+            //event[active].key_released.key = key;
 
-            event[active].key_released.window_id = window_handle;
+            event[active].key_released.window_id = windowID;
         },
         else => {
-            active = 0;
+            //active = 0;
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
         },
     }

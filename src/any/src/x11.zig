@@ -262,7 +262,7 @@ pub const X11Window = struct {
 
     pub fn draw(self: *@This(), pixmap_id: common.ImageID, target: common.BBox) !void {
         const copy_area_req = x11.CopyArea{
-            .src_drawable_id = pixmap_id,
+            .src_drawable_id = @truncate(pixmap_id),
             .dst_drawable_id = self.window_id,
             .graphic_context_id = self.graphic_context_id,
             .width = target.width,

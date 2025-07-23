@@ -1,5 +1,5 @@
-pub const WindowID = u32;
-pub const ImageID = u32;
+pub const WindowID = usize;
+pub const ImageID = usize;
 
 pub const Height = u16;
 pub const Width = u16;
