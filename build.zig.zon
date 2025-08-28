@@ -4,11 +4,8 @@
     .version = "0.0.0",
     .paths = .{"src"},
     .dependencies = .{
-        .windows = .{
-            .path = "../windows",
-        },
-        .x11 = .{
-            .path = "../x11",
+        .any = .{
+            .path = "src/any",
         },
     },
 }
