@@ -77,7 +77,7 @@ test "bytesFromValues" {
 
 /// Like io.sendWithBytes, but this build the bytes based on values.
 /// Example is CreateWindow WindowValue (to go with WindowMasks).
-pub fn sendWithValues(writer: anytype, request: anytype, values: anytype) !void {
+pub fn sendWithValues(writer: *std.Io.Writer, request: anytype, values: anytype) !void {
     var buffer = bufferFor(@TypeOf(values));
     const bytes = bytesFromValues(&buffer, values);
     try io.sendWithBytes(writer, request, bytes);
@@ -86,11 +86,19 @@ pub fn sendWithValues(writer: anytype, request: anytype, values: anytype) !void 
 /// Utility to get ID of an Atom.
 /// This is naive because it expects that the next message is always the reply.
 /// Works fine before you create a window.
-pub fn internAtom(conn: anytype, name: []const u8) !u32 {
-    const request = proto.InternAtom{ .length_of_name = @truncate(name.len) };
-    try io.sendWithBytes(conn, request, name);
+pub fn internAtom(conn: std.net.Stream, name: []const u8) !u32 {
+    var read_buffer: [512]u8 = undefined;
+    var conn_reader = conn.reader(&read_buffer);
+    const reader = conn_reader.interface();
 
-    const reply = try receiveReply(conn, proto.InternAtomReply);
+    var write_buffer: [512]u8 = undefined;
+    var conn_writer = conn.writer(&write_buffer);
+    const writer = &conn_writer.interface;
+
+    const request = proto.InternAtom{ .length_of_name = @truncate(name.len) };
+    try io.sendWithBytes(writer, request, name);
+
+    const reply = try receiveReply(reader, proto.InternAtomReply);
     if (reply) |r| {
         return r.atom;
     }
@@ -128,11 +136,11 @@ pub const ClientMessageData = union(enum) {
 /// Replies don't follow quite the same rules as regular Messages,
 /// It cannot be identified by first code.
 /// So here we explicitly wait for a reply.
-pub fn receiveReply(reader: anytype, ReplyType: type) !?ReplyType {
+pub fn receiveReply(reader: *std.Io.Reader, ReplyType: type) !?ReplyType {
     var message_buffer: [32]u8 = undefined;
-    _ = reader.read(&message_buffer) catch |err| {
+    reader.readSliceAll(&message_buffer) catch |err| {
         switch (err) {
-            error.WouldBlock => return null,
+            //error.WouldBlock => return null,
             else => return err,
         }
     };

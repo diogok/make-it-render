@@ -8,21 +8,30 @@ const proto = @import("proto.zig");
 
 const log = std.log.scoped(.x11);
 
+const endian = @import("builtin").cpu.arch.endian();
+
 /// First function to call on a new connection.
 /// It will return important information for most of following requests.
 pub fn setup(allocator: std.mem.Allocator, connection: std.net.Stream) !Setup {
     const auth = try xauth.get_auth(allocator);
     defer auth.deinit();
 
-    const reader = connection.reader();
+    var read_buffer: [512]u8 = undefined;
+    var conn_reader = connection.reader(&read_buffer);
+    const reader = conn_reader.interface();
 
-    try sendSetupRequest(connection, auth.name, auth.data);
+    var write_buffer: [512]u8 = undefined;
+    var conn_writer = connection.writer(&write_buffer);
+    const writer = &conn_writer.interface;
+
+    try sendSetupRequest(writer, auth.name, auth.data);
+
     const xdata = try readSetupReply(allocator, reader);
 
     return xdata;
 }
 
-fn sendSetupRequest(writer: anytype, auth_name: []const u8, auth_data: []const u8) !void {
+fn sendSetupRequest(writer: *std.Io.Writer, auth_name: []const u8, auth_data: []const u8) !void {
     const request_base = proto.SetupRequest{
         .auth_name_len = @intCast(auth_name.len),
         .auth_data_len = @intCast(auth_data.len),
@@ -35,14 +44,16 @@ fn sendSetupRequest(writer: anytype, auth_name: []const u8, auth_data: []const u
 
     try writer.writeAll(auth_data);
     try writer.writeAll(pad[0..(auth_data.len % 4)]);
+
+    try writer.flush();
 }
 
-fn readSetupReply(allocator: std.mem.Allocator, reader: anytype) !Setup {
-    const status_reply = try reader.readStruct(proto.SetupStatus);
+fn readSetupReply(allocator: std.mem.Allocator, reader: *std.Io.Reader) !Setup {
+    const status_reply = try reader.takeStruct(proto.SetupStatus, endian);
 
     const reply = try allocator.alloc(u8, status_reply.reply_len * 4);
     defer allocator.free(reply);
-    _ = try reader.read(reply); // read rest of response
+    try reader.readSliceAll(reply); // read rest of response
 
     switch (status_reply.status) {
         0 => return error.SetupFailed,

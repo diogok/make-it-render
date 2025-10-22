@@ -10,16 +10,17 @@ const log = std.log.scoped(.x11);
 
 /// Send a request to a socket.
 /// Use with any Request struct from proto namespace that does not need extra data.
-pub fn send(writer: anytype, request: anytype) !void {
+pub fn send(writer: *std.Io.Writer, request: anytype) !void {
     const req_bytes: []const u8 = &std.mem.toBytes(request);
     log.debug("Sending (size: {d}): {any}", .{ req_bytes.len, request });
     try writer.writeAll(req_bytes);
+    try writer.flush();
 }
 
 /// Send a request to a socket with some extra bytes at the end.
 /// It re-calculate the propriate length and add neded padding.
 /// Use with Request structs from proto namespace that require additional data to be sent.
-pub fn sendWithBytes(writer: anytype, request: anytype, bytes: []const u8) !void {
+pub fn sendWithBytes(writer: *std.Io.Writer, request: anytype, bytes: []const u8) !void {
     var req_bytes = std.mem.toBytes(request);
 
     // re-calc length to include extra data
@@ -45,6 +46,8 @@ pub fn sendWithBytes(writer: anytype, request: anytype, bytes: []const u8) !void
     const padding: [3]u8 = .{ 0, 0, 0 };
     const pad = padding[0..pad_len];
     try writer.writeAll(pad);
+
+    try writer.flush();
 }
 
 /// Return total length, including padding, that is need for whole data to be a multiple of 4.
@@ -92,14 +95,18 @@ test "padding length" {
 }
 
 /// Receive next message from X11 server.
-pub fn receive(reader: anytype) !?Message {
+pub fn receive(reader: *std.Io.Reader, conn_reader: ?*std.net.Stream.Reader) !?Message {
     var message_buffer: [32]u8 = undefined;
 
-    _ = reader.read(&message_buffer) catch |err| {
-        switch (err) {
-            error.WouldBlock => return null, // WouldBlock means a timeout, so there is no new message for now
-            else => return err,
+    reader.readSliceAll(&message_buffer) catch |err| {
+        if (conn_reader) |rdr| {
+            if (rdr.getError()) |n_err| {
+                if (n_err == error.WouldBlock) {
+                    return null; // just a timeout
+                }
+            }
         }
+        return err;
     };
 
     var message_stream = std.io.fixedBufferStream(&message_buffer);
@@ -123,13 +130,13 @@ pub fn receive(reader: anytype) !?Message {
         }
     }
 
-    log.warn("Unrecognized message: code={d} bytes={b} sent={any}", .{ message_code, message_buffer, sent_event });
+    log.warn("Unrecognized message: code={d} bytes={any} sent={any}", .{ message_code, &message_buffer, sent_event });
 
     return null;
 }
 
 /// A Map with all known messages, in order of message code.
-const Message = union(enum(u8)) {
+pub const Message = union(enum(u8)) {
     ErrorMessage: proto.ErrorMessage,
     Placeholder: proto.Placeholder,
     KeyPress: proto.KeyPress,

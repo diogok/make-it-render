@@ -240,7 +240,7 @@ pub const ButtonMask = enum(u16) {
     Button3 = 0b10000000000,
     Button4 = 0b100000000000,
     Button5 = 0b1000000000000,
-    ButtonAny = 0b1000000000000000000,
+    ButtonAny = 0b1000000000000000,
 };
 
 pub const ButtonPress = extern struct {
@@ -673,7 +673,7 @@ pub const DestroySubwindows = extern struct {
 
 pub const ChangeSaveSet = extern struct {
     opcode: u8 = 6,
-    mode: u8 = enum { Insert, Delete },
+    mode: enum(u8) { Insert, Delete } = .Insert,
     length: u16 = @sizeOf(@This()) / 4,
     window_id: u32,
 };
@@ -755,7 +755,7 @@ pub const ConfigureWindow = extern struct {
 
 pub const CirculateWindow = extern struct {
     opcode: u8 = 13,
-    direction: u8 = enum { RaiseLowest, LowerHighest },
+    direction: enum(u8) { RaiseLowest, LowerHighest } = .RaiseLowest,
     length: u16 = @sizeOf(@This()) / 4,
     window_id: u32,
 };

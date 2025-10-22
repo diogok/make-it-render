@@ -8,33 +8,45 @@ pub fn build(b: *std.Build) void {
         "x11",
         .{
             .root_source_file = b.path("src/x11.zig"),
+            .target = target,
+            .optimize = optimize,
+            .strip = optimize == .ReleaseSmall,
         },
     );
 
     {
-        const demo = b.addExecutable(.{
+        const demo_mod = b.addModule(
+            "demo",
+            .{
+                .root_source_file = b.path("src/demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .strip = optimize == .ReleaseSmall,
+            },
+        );
+        demo_mod.addImport("x11", x11);
+
+        const demo_exe = b.addExecutable(.{
             .name = "demo",
-            .target = target,
-            .optimize = optimize,
-            .strip = optimize == .ReleaseSmall,
-            .link_libc = optimize == .Debug,
-            .root_source_file = b.path("src/demo.zig"),
+            .root_module = demo_mod,
         });
-        demo.root_module.addImport("x11", x11);
 
-        b.installArtifact(demo);
+        b.installArtifact(demo_exe);
 
-        const run_cmd = b.addRunArtifact(demo);
+        const run_cmd = b.addRunArtifact(demo_exe);
         const run_step = b.step("run", "Run demo");
         run_step.dependOn(&run_cmd.step);
     }
 
     {
-        const tests = b.addTest(.{
-            .name = "x11",
+        const tests_mod = b.addModule("tests", .{
+            .root_source_file = b.path("src/x11.zig"),
             .target = target,
             .optimize = optimize,
-            .root_source_file = b.path("src/x11.zig"),
+        });
+
+        const tests = b.addTest(.{
+            .root_module = tests_mod,
         });
 
         const run_tests = b.addRunArtifact(tests);
@@ -43,11 +55,15 @@ pub fn build(b: *std.Build) void {
     }
 
     {
-        const docs = b.addObject(.{
-            .name = "docs",
+        const docs_mod = b.addModule("docs", .{
             .target = target,
             .optimize = .Debug,
             .root_source_file = b.path("src/docs.zig"),
+        });
+
+        const docs = b.addObject(.{
+            .name = "docs",
+            .root_module = docs_mod,
         });
 
         const install_docs = b.addInstallDirectory(.{
