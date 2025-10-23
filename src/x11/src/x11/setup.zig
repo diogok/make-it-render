@@ -16,11 +16,11 @@ pub fn setup(allocator: std.mem.Allocator, connection: std.net.Stream) !Setup {
     const auth = try xauth.get_auth(allocator);
     defer auth.deinit();
 
-    var read_buffer: [512]u8 = undefined;
+    var read_buffer: [32]u8 = undefined;
     var conn_reader = connection.reader(&read_buffer);
     const reader = conn_reader.interface();
 
-    var write_buffer: [512]u8 = undefined;
+    var write_buffer: [32]u8 = undefined;
     var conn_writer = connection.writer(&write_buffer);
     const writer = &conn_writer.interface;
 

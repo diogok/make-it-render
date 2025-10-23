@@ -15,15 +15,6 @@ pub fn main() !void {
     const conn = try x11.connect(.{});
     defer conn.close();
 
-    // New IO interfaces
-    var read_buffer: [512]u8 = undefined;
-    var conn_reader = conn.reader(&read_buffer);
-    const reader = conn_reader.interface();
-
-    var write_buffer: [512]u8 = undefined;
-    var conn_writer = conn.writer(&write_buffer);
-    const writer = &conn_writer.interface;
-
     // Setup will return all informationa about displays, colormode, the root window and others
     // This must be the first function called after connecting
     const info = try x11.setup(allocator, conn);
@@ -42,10 +33,10 @@ pub fn main() !void {
     // This function send a request (in this case: InterAtom) to X11, with some extra bytes
     // It calculates the right length and padding that X11 expects
     // There are other ways to send requests futher below
-    try x11.sendWithBytes(writer, intern_wm_protocols, "WM_PROTOCOLS");
+    try x11.sendWithBytes(conn, intern_wm_protocols, "WM_PROTOCOLS");
 
     // InternAtom generated a reply, here we read it
-    const wm_protocols = try x11.receiveReply(reader, x11.proto.InternAtomReply);
+    const wm_protocols = try x11.receiveReply(conn, x11.proto.InternAtomReply);
     if (wm_protocols == null) {
         return error.NoWMProtocols;
     }
@@ -86,12 +77,12 @@ pub fn main() !void {
         .value_mask = x11.maskFromValues(x11.proto.WindowMask, window_values),
     };
     // Here we send the CreateWindow request, with the extra values
-    try x11.sendWithValues(writer, create_window, window_values);
+    try x11.sendWithValues(conn, create_window, window_values);
 
     // After creating a Window, we Map it so it appears
     const map_req = x11.proto.MapWindow{ .window_id = window_id };
     // This is how you send a request without extra information
-    try x11.send(writer, map_req);
+    try x11.send(conn, map_req);
 
     // === Changing Window Properties === //
 
@@ -102,7 +93,7 @@ pub fn main() !void {
         .property_type = string_atom,
         .length_of_data = 5,
     };
-    try x11.sendWithBytes(writer, set_name_req, "hello");
+    try x11.sendWithBytes(conn, set_name_req, "hello");
 
     // Setting the Protocol to receive the window delete notification from window manager
     const set_protocols = x11.proto.ChangeProperty{
@@ -112,7 +103,7 @@ pub fn main() !void {
         .format = 32,
         .length_of_data = 1,
     };
-    try x11.sendWithBytes(writer, set_protocols, &std.mem.toBytes(wm_delete_window_atom));
+    try x11.sendWithBytes(conn, set_protocols, &std.mem.toBytes(wm_delete_window_atom));
 
     // === Drawing and graphics === //
 
@@ -129,7 +120,7 @@ pub fn main() !void {
         .drawable_id = window_id,
         .value_mask = x11.maskFromValues(x11.proto.GraphicContextMask, graphic_context_values),
     };
-    try x11.sendWithValues(writer, create_gc, graphic_context_values);
+    try x11.sendWithValues(conn, create_gc, graphic_context_values);
 
     // We draw in a pixmap
     // This is where the pixels go
@@ -141,7 +132,7 @@ pub fn main() !void {
         .height = 5,
         .depth = create_window.depth,
     };
-    try x11.send(writer, pixmap_req);
+    try x11.send(conn, pixmap_req);
 
     // Let's make a little yellow square
     var yellow_block: [5 * 5 * 4]u8 = undefined;
@@ -175,7 +166,7 @@ pub fn main() !void {
         .y = 0,
         .depth = pixmap_req.depth,
     };
-    try x11.sendWithBytes(writer, put_image_req, yellow_block_zpixmap);
+    try x11.sendWithBytes(conn, put_image_req, yellow_block_zpixmap);
 
     // === Main loop === //
 
@@ -183,7 +174,7 @@ pub fn main() !void {
     // Here we receive events and send draw requests
     var open = true;
     while (open) {
-        while (try x11.receive(reader, &conn_reader)) |message| {
+        while (try x11.receive(conn)) |message| {
             switch (message) {
                 .Expose => {
                     // Expose means we need to draw to the window
@@ -194,7 +185,7 @@ pub fn main() !void {
                     const clear_area = x11.proto.ClearArea{
                         .window_id = window_id,
                     };
-                    try x11.send(writer, clear_area);
+                    try x11.send(conn, clear_area);
 
                     // Than we copy our pixmap to our window
                     // again using the graphic context
@@ -208,7 +199,7 @@ pub fn main() !void {
                         .dst_x = 100,
                         .dst_y = 200,
                     };
-                    try x11.send(writer, copy_area_req);
+                    try x11.send(conn, copy_area_req);
                 },
                 .ClientMessage => |client_message| {
                     // ClientMessage is how other X11 clients communicate
@@ -224,8 +215,8 @@ pub fn main() !void {
     }
 
     // When done, we can release all resources.
-    try x11.send(writer, x11.proto.FreeGraphicContext{ .graphic_context_id = graphic_context_id });
-    try x11.send(writer, x11.proto.FreePixmap{ .pixmap_id = pixmap_id });
-    try x11.send(writer, x11.proto.UnmapWindow{ .window_id = window_id });
-    try x11.send(writer, x11.proto.DestroyWindow{ .window_id = window_id });
+    try x11.send(conn, x11.proto.FreeGraphicContext{ .graphic_context_id = graphic_context_id });
+    try x11.send(conn, x11.proto.FreePixmap{ .pixmap_id = pixmap_id });
+    try x11.send(conn, x11.proto.UnmapWindow{ .window_id = window_id });
+    try x11.send(conn, x11.proto.DestroyWindow{ .window_id = window_id });
 }

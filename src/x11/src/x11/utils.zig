@@ -77,28 +77,20 @@ test "bytesFromValues" {
 
 /// Like io.sendWithBytes, but this build the bytes based on values.
 /// Example is CreateWindow WindowValue (to go with WindowMasks).
-pub fn sendWithValues(writer: *std.Io.Writer, request: anytype, values: anytype) !void {
+pub fn sendWithValues(conn: std.net.Stream, request: anytype, values: anytype) !void {
     var buffer = bufferFor(@TypeOf(values));
     const bytes = bytesFromValues(&buffer, values);
-    try io.sendWithBytes(writer, request, bytes);
+    try io.sendWithBytes(conn, request, bytes);
 }
 
 /// Utility to get ID of an Atom.
 /// This is naive because it expects that the next message is always the reply.
 /// Works fine before you create a window.
 pub fn internAtom(conn: std.net.Stream, name: []const u8) !u32 {
-    var read_buffer: [512]u8 = undefined;
-    var conn_reader = conn.reader(&read_buffer);
-    const reader = conn_reader.interface();
-
-    var write_buffer: [512]u8 = undefined;
-    var conn_writer = conn.writer(&write_buffer);
-    const writer = &conn_writer.interface;
-
     const request = proto.InternAtom{ .length_of_name = @truncate(name.len) };
-    try io.sendWithBytes(writer, request, name);
+    try io.sendWithBytes(conn, request, name);
 
-    const reply = try receiveReply(reader, proto.InternAtomReply);
+    const reply = try receiveReply(conn, proto.InternAtomReply);
     if (reply) |r| {
         return r.atom;
     }
@@ -132,18 +124,20 @@ pub const ClientMessageData = union(enum) {
     u32: [5]u32,
 };
 
+pub fn receiveReply(conn: std.net.Stream, ReplyType: type) !?ReplyType {
+    var read_buffer: [32]u8 = undefined;
+    var conn_reader = conn.reader(&read_buffer);
+    const reader = conn_reader.interface();
+    return readReply(reader, ReplyType);
+}
+
 /// Same a io.Receive, but for specific replies.
 /// Replies don't follow quite the same rules as regular Messages,
 /// It cannot be identified by first code.
 /// So here we explicitly wait for a reply.
-pub fn receiveReply(reader: *std.Io.Reader, ReplyType: type) !?ReplyType {
+pub fn readReply(reader: *std.Io.Reader, ReplyType: type) !?ReplyType {
     var message_buffer: [32]u8 = undefined;
-    reader.readSliceAll(&message_buffer) catch |err| {
-        switch (err) {
-            //error.WouldBlock => return null,
-            else => return err,
-        }
-    };
+    try reader.readSliceAll(&message_buffer);
 
     var message_stream = std.io.fixedBufferStream(&message_buffer);
     var message_reader = message_stream.reader();
