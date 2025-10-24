@@ -3,7 +3,7 @@ pub fn main() !void {
     defer std.debug.assert(gpa.deinit() != .leak);
     const allocator = gpa.allocator();
 
-    var wm = try win.WM.init(allocator);
+    var wm = try win.WindowManager.init(allocator);
     defer wm.deinit();
 
     var window = try wm.createWindow(

@@ -4,37 +4,33 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const x11_dep = b.dependency("x11", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    const x11 = x11_dep.module("x11");
+    const anywindow = b.dependency("anywindow", .{ .target = target, .optimize = optimize });
 
-    const windows_dep = b.dependency("windows", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    const windows = windows_dep.module("windows");
-
-    const any = b.addModule(
-        "anywindow",
+    const make_it_render = b.addModule(
+        "make_it_render",
         .{
             .root_source_file = b.path("src/root.zig"),
+            .target = target,
+            .optimize = optimize,
+            .strip = optimize == .ReleaseSmall,
         },
     );
-    any.addImport("x11", x11);
-    any.addImport("windows", windows);
+    make_it_render.addImport("anywindow", anywindow.module("anywindow"));
 
     {
-        const demo = b.addExecutable(.{
-            .name = "demo",
+        const demo_mod = b.addModule("demo", .{
+            .root_source_file = b.path("src/demo.zig"),
             .target = target,
             .optimize = optimize,
             .strip = optimize == .ReleaseSmall,
             .link_libc = optimize == .Debug,
-            .root_source_file = b.path("src/demo.zig"),
         });
-        demo.root_module.addImport("anywindow", any);
+        demo_mod.addImport("make_it_render", make_it_render);
+
+        const demo = b.addExecutable(.{
+            .name = "demo",
+            .root_module = demo_mod,
+        });
 
         b.installArtifact(demo);
 
@@ -44,14 +40,16 @@ pub fn build(b: *std.Build) void {
     }
 
     {
-        const tests = b.addTest(.{
-            .name = "anywindow",
+        const tests_mod = b.addModule("tests", .{
             .target = target,
             .optimize = optimize,
             .root_source_file = b.path("src/root.zig"),
         });
-        tests.root_module.addImport("x11", x11);
-        tests.root_module.addImport("windows", windows);
+        tests_mod.addImport("make_it_render", make_it_render);
+
+        const tests = b.addTest(.{
+            .root_module = tests_mod,
+        });
 
         const run_tests = b.addRunArtifact(tests);
         const run_tests_step = b.step("test", "Run tests");
@@ -59,14 +57,17 @@ pub fn build(b: *std.Build) void {
     }
 
     {
-        const docs = b.addObject(.{
-            .name = "docs",
+        const docs_mod = b.addModule("docs", .{
             .target = target,
             .optimize = .Debug,
             .root_source_file = b.path("src/root.zig"),
         });
-        docs.root_module.addImport("x11", x11);
-        docs.root_module.addImport("windows", windows);
+        docs_mod.addImport("make_it_render", make_it_render);
+
+        const docs = b.addObject(.{
+            .name = "docs",
+            .root_module = docs_mod,
+        });
 
         const install_docs = b.addInstallDirectory(.{
             .source_dir = docs.getEmittedDocs(),

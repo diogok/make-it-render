@@ -1,11 +1,17 @@
 .{
-    .name = .anywindow,
-    .fingerprint = 0x2ba6fe46fef1f9fb,
+    .name = .make_it_render,
+    .fingerprint = 0x217ca3d502b3f29c,
     .version = "0.0.0",
-    .paths = .{"src"},
     .dependencies = .{
-        .any = .{
-            .path = "src/any",
+        .anywindow = .{
+            .path = "src/anywindow",
         },
+    },
+    .paths = .{
+        "src",
+        "README.md",
+        "LICENSE",
+        "build.zig",
+        "build.zig.zon",
     },
 }

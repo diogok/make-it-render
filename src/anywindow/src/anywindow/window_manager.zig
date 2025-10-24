@@ -6,13 +6,13 @@ const builtin = @import("builtin");
 const x11 = @import("x11.zig");
 const windows = @import("windows.zig");
 
-pub const WM = switch (builtin.os.tag) {
+pub const WindowManager = switch (builtin.os.tag) {
     .linux => x11.X11WM,
     .windows => windows.WindowsWM,
     else => @compileError("platform not supported"),
 };
 
 test "init" {
-    var wm = try WM.init(testing.allocator);
+    var wm = try WindowManager.init(testing.allocator);
     defer wm.deinit();
 }

@@ -1,7 +1,7 @@
-pub const wm = @import("wm.zig");
-pub const common = @import("common.zig");
+pub const wm = @import("anywindow/window_manager.zig");
+pub const common = @import("anywindow/common.zig");
 
-pub const WM = wm.WM;
+pub const WindowManager = wm.WindowManager;
 
 pub const WindowID = common.WindowID;
 pub const ImageID = common.ImageID;

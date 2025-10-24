@@ -6,3 +6,4 @@
 - VSync
 - Fullscreen, windowed
 - Window Icon
+- x11 shmem
