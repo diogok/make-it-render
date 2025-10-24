@@ -104,7 +104,7 @@ pub fn windowProc(
     message_type: win.MessageType,
     wparam: usize,
     lparam: isize,
-) callconv(.C) isize {
+) callconv(.winapi) isize {
     switch (message_type) {
         .WM_CREATE => {},
         .WM_DESTROY => {

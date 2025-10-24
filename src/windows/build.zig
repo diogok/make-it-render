@@ -4,14 +4,18 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const windows = b.addModule("windows", .{ .root_source_file = b.path("src/root.zig") });
+    const windows = b.addModule("windows", .{ .root_source_file = b.path("src/win.zig") });
 
     {
-        const exe = b.addExecutable(.{
-            .name = "demo",
+        const mod = b.addModule("demo", .{
             .target = target,
             .optimize = optimize,
             .root_source_file = b.path("src/demo.zig"),
+        });
+
+        const exe = b.addExecutable(.{
+            .name = "demo",
+            .root_module = mod,
         });
 
         exe.root_module.addImport("windows", windows);

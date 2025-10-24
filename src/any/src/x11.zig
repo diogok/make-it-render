@@ -139,7 +139,7 @@ pub const X11Window = struct {
 
     pub fn init(wm: *X11WM, options: common.WindowOptions) !@This() {
         const window_id = try wm.xid.genID();
-        const event_masks = [_]x11.EventMask{
+        const event_masks = [_]x11.proto.EventMask{
             .Exposure,
             .StructureNotify,
             .SubstructureNotify,
@@ -150,12 +150,12 @@ pub const X11Window = struct {
             .ButtonRelease,
             .PointerMotion,
         };
-        const window_values = x11.WindowValue{
+        const window_values = x11.proto.WindowValue{
             .BackgroundPixel = wm.info.screens[0].black_pixel,
             .EventMask = x11.mask(&event_masks),
             .Colormap = wm.info.screens[0].colormap,
         };
-        const create_window = x11.CreateWindow{
+        const create_window = x11.proto.CreateWindow{
             .window_id = window_id,
 
             .parent_id = wm.info.screens[0].root,
@@ -169,14 +169,14 @@ pub const X11Window = struct {
             .border_width = 0,
             .window_class = .InputOutput,
 
-            .value_mask = x11.maskFromValues(x11.WindowMask, window_values),
+            .value_mask = x11.maskFromValues(x11.proto.WindowMask, window_values),
         };
         try x11.sendWithValues(wm.conn, create_window, window_values);
 
-        const map_req = x11.MapWindow{ .window_id = window_id };
+        const map_req = x11.proto.MapWindow{ .window_id = window_id };
         try x11.send(wm.conn, map_req);
 
-        const set_name_req = x11.ChangeProperty{
+        const set_name_req = x11.proto.ChangeProperty{
             .window_id = window_id,
             .property = wm.atoms.wm_name,
             .property_type = wm.atoms.string,
@@ -184,7 +184,7 @@ pub const X11Window = struct {
         };
         try x11.sendWithBytes(wm.conn, set_name_req, options.title);
 
-        const set_protocols = x11.ChangeProperty{
+        const set_protocols = x11.proto.ChangeProperty{
             .window_id = window_id,
             .property = wm.atoms.wm_protocols,
             .property_type = wm.atoms.atom,
@@ -194,15 +194,15 @@ pub const X11Window = struct {
         try x11.sendWithBytes(wm.conn, set_protocols, &std.mem.toBytes(wm.atoms.wm_delete_window));
 
         const graphic_context_id = try wm.xid.genID();
-        const graphic_context_values = x11.GraphicContextValue{
+        const graphic_context_values = x11.proto.GraphicContextValue{
             .Background = wm.info.screens[0].black_pixel,
             .Foreground = wm.info.screens[0].white_pixel,
         };
 
-        const create_gc = x11.CreateGraphicContext{
+        const create_gc = x11.proto.CreateGraphicContext{
             .graphic_context_id = graphic_context_id,
             .drawable_id = window_id,
-            .value_mask = x11.maskFromValues(x11.GraphicContextMask, graphic_context_values),
+            .value_mask = x11.maskFromValues(x11.proto.GraphicContextMask, graphic_context_values),
         };
         try x11.sendWithValues(wm.conn, create_gc, graphic_context_values);
 
@@ -218,8 +218,8 @@ pub const X11Window = struct {
     }
 
     pub fn destroy(self: *@This()) !void {
-        try x11.send(self.wm.conn, x11.UnmapWindow{ .window_id = self.window_id });
-        try x11.send(self.wm.conn, x11.DestroyWindow{ .window_id = self.window_id });
+        try x11.send(self.wm.conn, x11.proto.UnmapWindow{ .window_id = self.window_id });
+        try x11.send(self.wm.conn, x11.proto.DestroyWindow{ .window_id = self.window_id });
         self.status = .closed;
     }
 
@@ -227,7 +227,7 @@ pub const X11Window = struct {
         const image_info = x11.getImageInfo(self.wm.info, self.root);
 
         const pixmap_id = try self.wm.xid.genID();
-        const pixmap_req = x11.CreatePixmap{
+        const pixmap_req = x11.proto.CreatePixmap{
             .pixmap_id = pixmap_id,
             .drawable_id = self.window_id,
             .width = image.width,
@@ -239,7 +239,7 @@ pub const X11Window = struct {
         const zpixmap = try x11.rgbaToZPixmapAlloc(self.wm.allocator, image_info, image.pixels);
         defer self.wm.allocator.free(zpixmap);
 
-        const put_image_req = x11.PutImage{
+        const put_image_req = x11.proto.PutImage{
             .drawable_id = pixmap_id,
             .graphic_context_id = self.graphic_context_id,
             .width = image.width,
@@ -254,14 +254,14 @@ pub const X11Window = struct {
     }
 
     pub fn clear(self: *@This()) !void {
-        const clear_area = x11.ClearArea{
+        const clear_area = x11.proto.ClearArea{
             .window_id = self.window_id,
         };
         try x11.send(self.wm.conn, clear_area);
     }
 
     pub fn draw(self: *@This(), pixmap_id: common.ImageID, target: common.BBox) !void {
-        const copy_area_req = x11.CopyArea{
+        const copy_area_req = x11.proto.CopyArea{
             .src_drawable_id = @truncate(pixmap_id),
             .dst_drawable_id = self.window_id,
             .graphic_context_id = self.graphic_context_id,

@@ -12,9 +12,9 @@ pub const W = @import("std").unicode.utf8ToUtf16LeAllocZ;
 pub const W2 = @import("std").unicode.utf8ToUtf16LeStringLiteral;
 
 /// Return your program module Instance.
-pub extern "kernel32" fn GetModuleHandleW(moduleName: ?String) callconv(.C) ?Instance;
+pub extern "kernel32" fn GetModuleHandleW(moduleName: ?String) callconv(.winapi) ?Instance;
 /// Return the last error number, check on MS documentation what the code means.
-pub extern "kernel32" fn GetLastError() callconv(.C) u32;
+pub extern "kernel32" fn GetLastError() callconv(.winapi) u32;
 
 pub fn loword(lParam: isize) u16 {
     const value: usize = @bitCast(lParam);
@@ -54,7 +54,7 @@ pub fn hibyte(val: u16) u8 {
 
 pub extern "user32" fn RegisterClassExW(
     window_class: ?*const WindowClass,
-) callconv(.C) WindowClassAtom;
+) callconv(.winapi) WindowClassAtom;
 
 pub extern "user32" fn CreateWindowExW(
     ex_style: ExtendedWindowStyle,
@@ -69,32 +69,32 @@ pub extern "user32" fn CreateWindowExW(
     menu: ?MenuHandler,
     instance: ?Instance,
     lpParam: ?*anyopaque,
-) callconv(.C) ?WindowHandle;
+) callconv(.winapi) ?WindowHandle;
 
 pub extern "user32" fn ShowWindow(
     window_handle: ?WindowHandle,
     display: u32,
-) callconv(.C) ?WindowHandle;
+) callconv(.winapi) ?WindowHandle;
 
 pub extern "user32" fn GetMessageW(
     message: ?*Message,
     window_handle: ?WindowHandle,
     filter_min: u32,
     filter_max: u32,
-) callconv(.C) i32;
+) callconv(.winapi) i32;
 
 pub extern "user32" fn TranslateMessage(
     message: ?*const Message,
-) callconv(.C) c_int;
+) callconv(.winapi) c_int;
 
 pub extern "user32" fn DispatchMessageW(
     lpMsg: ?*const Message,
-) callconv(.C) isize;
+) callconv(.winapi) isize;
 
 /// End the program.
 pub extern "user32" fn PostQuitMessage(
     val: i32,
-) callconv(.C) void;
+) callconv(.winapi) void;
 
 /// WindowProcedure is the function signature to handle window messages.
 pub const WindowProcedure = switch (@import("builtin").zig_backend) {
@@ -103,13 +103,13 @@ pub const WindowProcedure = switch (@import("builtin").zig_backend) {
         message_type: MessageType,
         wParam: usize,
         lParam: isize,
-    ) callconv(.C) isize,
+    ) callconv(.winapi) isize,
     else => *const fn (
         window_handle: WindowHandle,
         message_type: MessageType,
         wParam: usize,
         lParam: isize,
-    ) callconv(.C) isize,
+    ) callconv(.winapi) isize,
 };
 
 /// This is the default handler for windows procedures/messages.
@@ -120,7 +120,7 @@ pub extern "user32" fn DefWindowProcW(
     message_type: MessageType,
     wParam: usize,
     lParam: isize,
-) callconv(.C) isize;
+) callconv(.winapi) isize;
 
 pub const WindowHandle = *anyopaque;
 pub const WindowClassAtom = u16;
@@ -266,15 +266,15 @@ pub fn mouseWheelDelta(wparam: usize) i16 {
 pub extern "user32" fn LoadCursorW(
     instance: ?Instance,
     cursor: CursorName,
-) callconv(.C) ?CursorHandler;
+) callconv(.winapi) ?CursorHandler;
 
 pub extern "user32" fn ShowCursor(
     show: bool,
-) callconv(.C) i32;
+) callconv(.winapi) i32;
 
 pub extern "user32" fn SetCursor(
     cursor: ?CursorHandler,
-) callconv(.C) ?CursorHandler;
+) callconv(.winapi) ?CursorHandler;
 
 pub const CursorHandler = *anyopaque;
 
@@ -282,34 +282,34 @@ pub const CursorHandler = *anyopaque;
 
 pub extern "user32" fn UpdateWindow(
     window_handle: ?WindowHandle,
-) callconv(.C) bool;
+) callconv(.winapi) bool;
 
-pub extern "dwmapi" fn DwmFlush() callconv(.C) isize;
+pub extern "dwmapi" fn DwmFlush() callconv(.winapi) isize;
 
 pub extern "user32" fn InvalidateRect(
     window_handle: ?WindowHandle,
     rect: ?*Rect,
     erase: bool,
-) callconv(.C) bool;
+) callconv(.winapi) bool;
 
 pub extern "user32" fn BeginPaint(
     window_handle: WindowHandle,
     paint: *Paint,
-) callconv(.C) ?DeviceContext;
+) callconv(.winapi) ?DeviceContext;
 
 pub extern "user32" fn EndPaint(
     window_handle: WindowHandle,
     lpPaint: *Paint,
-) callconv(.C) bool;
+) callconv(.winapi) bool;
 
 pub extern "user32" fn GetDC(
     handle: ?WindowHandle,
-) callconv(.C) ?DeviceContext;
+) callconv(.winapi) ?DeviceContext;
 
 pub extern "user32" fn ReleaseDC(
     window: ?WindowHandle,
     handle: ?DeviceContext,
-) callconv(.C) c_int;
+) callconv(.winapi) c_int;
 
 pub extern "user32" fn BitBlt(
     dstHDC: ?DeviceContext,
@@ -321,20 +321,20 @@ pub extern "user32" fn BitBlt(
     srcX: i32,
     srcY: i32,
     op: RasterOperation,
-) callconv(.C) bool;
+) callconv(.winapi) bool;
 
 pub extern "gdi32" fn CreateCompatibleDC(
     handle: ?DeviceContext,
-) callconv(.C) ?DeviceContext;
+) callconv(.winapi) ?DeviceContext;
 
 pub extern "user32" fn SelectObject(
     handle0: ?DeviceContext,
     handle1: ?Bitmap,
-) callconv(.C) DeviceContext;
+) callconv(.winapi) DeviceContext;
 
 pub extern "gdi32" fn DeleteObject(
     handle: ?Bitmap,
-) callconv(.C) bool;
+) callconv(.winapi) bool;
 
 pub extern "gdi32" fn CreateDIBSection(
     handle: ?DeviceContext,
@@ -343,7 +343,7 @@ pub extern "gdi32" fn CreateDIBSection(
     ppvBits: *[*]u8,
     hSection: ?*anyopaque,
     offset: u32,
-) callconv(.C) ?Bitmap;
+) callconv(.winapi) ?Bitmap;
 
 pub const DeviceContext = *anyopaque;
 pub const Bitmap = *anyopaque;
