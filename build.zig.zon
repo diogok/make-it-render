@@ -1,10 +1,13 @@
 .{
     .name = .make_it_render,
-    .fingerprint = 0x217ca3d502b3f29c,
+    .fingerprint = 0x217ca3d5b75f2487,
     .version = "0.0.0",
     .dependencies = .{
         .anywindow = .{
             .path = "src/anywindow",
+        },
+        .textz = .{
+            .path = "src/textz",
         },
     },
     .paths = .{

@@ -4,8 +4,6 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const anywindow = b.dependency("anywindow", .{ .target = target, .optimize = optimize });
-
     const make_it_render = b.addModule(
         "make_it_render",
         .{
@@ -15,7 +13,12 @@ pub fn build(b: *std.Build) void {
             .strip = optimize == .ReleaseSmall,
         },
     );
+
+    const anywindow = b.dependency("anywindow", .{ .target = target, .optimize = optimize });
     make_it_render.addImport("anywindow", anywindow.module("anywindow"));
+
+    const textz = b.dependency("textz", .{ .target = target, .optimize = optimize });
+    make_it_render.addImport("textz", textz.module("textz"));
 
     {
         const demo_mod = b.addModule("demo", .{
