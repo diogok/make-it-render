@@ -4,7 +4,6 @@ pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Font 
 
     var font = common.Font{
         .allocator = allocator,
-        .reader = reader,
         .glyphs = glyphs,
         .buffer = &[0]u8{},
     };
