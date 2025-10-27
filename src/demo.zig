@@ -82,5 +82,6 @@ const log = std.log.scoped(.demo);
 pub const std_options: std.Options = .{
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .x11, .level = .warn },
+        .{ .scope = .demo, .level = .debug },
     },
 };

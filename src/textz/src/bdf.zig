@@ -37,6 +37,15 @@ pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Font 
             font.height = try std.fmt.parseInt(u16, tokenizer.next().?, 10);
         } else if (std.mem.eql(u8, prop, "FONT_ASCENT")) {
             font.ascent = try std.fmt.parseInt(u16, tokenizer.next().?, 10);
+        } else if (std.mem.eql(u8, prop, "CHARS")) {
+            font.count = try std.fmt.parseInt(u32, tokenizer.next().?, 10);
+
+            // pre-allocate all bitmaps
+            font.buffer = try allocator.alloc(u8, font.count * font.width * font.height);
+            buf_alloc = std.heap.FixedBufferAllocator.init(font.buffer);
+
+            // ensure hashmap size
+            try font.glyphs.ensureTotalCapacity(allocator, font.count);
         } else if (std.mem.eql(u8, prop, "ENCODING")) {
             glyph.encoding = try std.fmt.parseInt(u21, tokenizer.next().?, 10);
         } else if (std.mem.eql(u8, prop, "DWIDTH")) {
@@ -50,15 +59,6 @@ pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Font 
             if (glyph.advance == 0) {
                 glyph.advance = glyph.bbox.width;
             }
-        } else if (std.mem.eql(u8, prop, "CHARS")) {
-            font.count = try std.fmt.parseInt(u32, tokenizer.next().?, 10);
-
-            // pre-allocate all bitmaps
-            font.buffer = try allocator.alloc(u8, font.count * font.width * font.height);
-            buf_alloc = std.heap.FixedBufferAllocator.init(font.buffer);
-
-            // ensure hashmap size
-            try font.glyphs.ensureTotalCapacity(allocator, font.count);
         } else if (std.mem.eql(u8, prop, "ENDCHAR")) {
             glyph.bitmap = bitmap;
             try font.glyphs.put(allocator, glyph.encoding, glyph);
@@ -163,3 +163,5 @@ const std = @import("std");
 const testing = std.testing;
 
 const common = @import("common.zig");
+
+const log = std.log.scoped(.bdf);
