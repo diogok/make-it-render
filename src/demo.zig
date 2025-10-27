@@ -3,6 +3,8 @@ pub fn main() !void {
     defer std.debug.assert(gpa.deinit() != .leak);
     const allocator = gpa.allocator();
 
+    var timer = try std.time.Timer.start();
+
     var wm = try anywin.WindowManager.init(allocator);
     defer wm.deinit();
 
@@ -12,11 +14,15 @@ pub fn main() !void {
         },
     );
 
+    log.debug("Time to window: {d}ms", .{timer.lap() / std.time.ns_per_ms});
+
     const unifont = try textz.unifont.unifont(allocator);
     defer unifont.deinit();
 
     const text = try textz.text.render(allocator, &[_]textz.common.Font{unifont}, "Hello, world!");
     defer text.deinit();
+
+    log.debug("Time to font: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
     const text_pixels = try bitsToColor(
         allocator,
@@ -33,6 +39,9 @@ pub fn main() !void {
 
     const image_id = try window.createImage(text_image);
 
+    log.debug("Time to image: {d}ms", .{timer.lap() / std.time.us_per_ms});
+
+    try window.show();
     while (window.status == .open) {
         const event = try wm.receive();
         switch (event) {
@@ -40,6 +49,7 @@ pub fn main() !void {
                 try window.destroy();
             },
             .draw => {
+                timer.reset();
                 const target = anywin.BBox{
                     .x = 100,
                     .y = 100,
@@ -47,6 +57,7 @@ pub fn main() !void {
                     .width = text_image.width,
                 };
                 try window.draw(image_id, target);
+                log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.us_per_ms});
             },
             .mouse_pressed, .mouse_released, .key_pressed, .key_released => {
                 log.debug("{any}", .{event});

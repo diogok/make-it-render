@@ -84,9 +84,6 @@ pub const WindowsWindow = struct {
             return error.CreateWindowError;
         }
 
-        _ = win.ShowWindow(handle, 1);
-        while (win.ShowCursor(true) < 1) {}
-
         return @This(){
             .wm = wm,
             .handle = handle.?,
@@ -100,6 +97,11 @@ pub const WindowsWindow = struct {
         self.images.deinit();
         self.wm.allocator.free(self.title);
         self.status = .closed;
+    }
+
+    pub fn show(self: *@This()) !void {
+        _ = win.ShowWindow(self.handle, 1);
+        while (win.ShowCursor(true) < 1) {}
     }
 
     pub fn createImage(self: *@This(), img: common.Image) !common.ImageID {

@@ -173,9 +173,6 @@ pub const X11Window = struct {
         };
         try x11.sendWithValues(wm.conn, create_window, window_values);
 
-        const map_req = x11.proto.MapWindow{ .window_id = window_id };
-        try x11.send(wm.conn, map_req);
-
         const set_name_req = x11.proto.ChangeProperty{
             .window_id = window_id,
             .property = wm.atoms.wm_name,
@@ -221,6 +218,11 @@ pub const X11Window = struct {
         try x11.send(self.wm.conn, x11.proto.UnmapWindow{ .window_id = self.window_id });
         try x11.send(self.wm.conn, x11.proto.DestroyWindow{ .window_id = self.window_id });
         self.status = .closed;
+    }
+
+    pub fn show(self: *@This()) !void {
+        const map_req = x11.proto.MapWindow{ .window_id = self.window_id };
+        try x11.send(self.wm.conn, map_req);
     }
 
     pub fn createImage(self: *@This(), image: common.Image) !common.ImageID {
