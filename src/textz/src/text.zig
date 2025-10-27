@@ -45,7 +45,7 @@ pub fn render(
 }
 
 test "Render a short phrase" {
-    const uni = try @import("fonts/unifont.zig").unifont(testing.allocator);
+    const uni = try @import("fonts/unifont/unifont.zig").unifont(testing.allocator);
     defer uni.deinit();
 
     const text = "I, am!";

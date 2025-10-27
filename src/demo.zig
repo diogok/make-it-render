@@ -16,15 +16,19 @@ pub fn main() !void {
 
     log.debug("Time to window: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
+    const terminus = try textz.terminus.terminus(allocator, .@"16", .n);
+    defer terminus.deinit();
     const unifont = try textz.unifont.unifont(allocator);
     defer unifont.deinit();
+    const unifont_jp = try textz.unifont.unifont_jp(allocator);
+    defer unifont_jp.deinit();
 
-    const text = try textz.text.render(allocator, &[_]textz.common.Font{unifont}, "Hello, world!");
+    const text = try textz.text.render(allocator, &[_]textz.common.Font{ terminus, unifont, unifont_jp }, "Hello, world!");
     defer text.deinit();
 
     log.debug("Time to font: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
-    const text_pixels = try bitsToColor(
+    const text_pixels = try anywin.fns.bitsToColor(
         allocator,
         .{ 255, 128, 0 },
         text.bitmap,
@@ -65,30 +69,6 @@ pub fn main() !void {
             else => {},
         }
     }
-}
-
-fn bitsToColor(
-    allocator: std.mem.Allocator,
-    color: [3]u8,
-    bits: []const u1,
-) ![]u8 {
-    const pixels = try allocator.alloc(u8, bits.len * 4);
-    var pos: usize = 0;
-    for (bits) |bit| {
-        if (bit == 1) {
-            pixels[pos] = color[0];
-            pixels[pos + 1] = color[1];
-            pixels[pos + 2] = color[2];
-            pixels[pos + 3] = 1;
-        } else {
-            pixels[pos] = 0;
-            pixels[pos + 1] = 0;
-            pixels[pos + 2] = 0;
-            pixels[pos + 3] = 0;
-        }
-        pos += 4;
-    }
-    return pixels;
 }
 
 const std = @import("std");

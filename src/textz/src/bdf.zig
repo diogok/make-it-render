@@ -102,7 +102,7 @@ pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Font 
 }
 
 test "read unifont" {
-    const unifont_gz = @embedFile("fonts/unifont-17.0.02.bdf.gz");
+    const unifont_gz = @embedFile("fonts/unifont/unifont-17.0.02.bdf.gz");
 
     var buffer_reader = std.Io.Reader.fixed(unifont_gz);
     var buffer: [std.compress.flate.max_window_len]u8 = undefined;

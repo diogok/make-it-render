@@ -1,5 +1,6 @@
 pub const wm = @import("anywindow/window_manager.zig");
 pub const common = @import("anywindow/common.zig");
+pub const fns = @import("anywindow/fns.zig");
 
 pub const WindowManager = wm.WindowManager;
 
@@ -20,4 +21,5 @@ pub const Event = common.Event;
 test {
     _ = wm;
     _ = common;
+    _ = fns;
 }
