@@ -134,22 +134,24 @@ pub fn main() !void {
     };
     try x11.send(conn, pixmap_req);
 
-    // Let's make a little yellow square
-    var yellow_block: [5 * 5 * 4]u8 = undefined;
-    var byte_index: usize = 0;
-    while (byte_index < yellow_block.len) : (byte_index += 4) {
-        yellow_block[byte_index] = 255; // red
-        yellow_block[byte_index + 1] = 150; // green
-        yellow_block[byte_index + 2] = 0; // blue
-        yellow_block[byte_index + 3] = 0; // padding
-    }
+    // Let's make a little yellow triangle
+    const y = [4]u8{ 255, 150, 0, 1 };
+    const b = [4]u8{ 0, 0, 0, 0 };
+    const yellow_block: [5 * 5][4]u8 = [_][4]u8{
+        b, b, y, b, b,
+        b, y, y, y, b,
+        b, y, y, y, b,
+        y, y, y, y, y,
+        y, y, y, y, y,
+    };
+    const pixels = std.mem.toBytes(yellow_block);
 
     // X11 does not work with RGB(a) as describe above, instead that are more information and formats needed
     // This function return some information to make it posible to convert to X11 expected format
     const imageInfo = x11.getImageInfo(info, create_window.parent_id);
 
     // Here we will convert to a format called ZPixmap
-    const yellow_block_zpixmap = try x11.rgbaToZPixmapAlloc(allocator, imageInfo, &yellow_block);
+    const yellow_block_zpixmap = try x11.rgbaToZPixmapAlloc(allocator, imageInfo, &pixels);
     defer allocator.free(yellow_block_zpixmap);
 
     // Now that we how our pixels on the expected format

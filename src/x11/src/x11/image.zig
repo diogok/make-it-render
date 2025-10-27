@@ -79,22 +79,13 @@ pub fn rgbaToZPixmapAlloc(allocator: std.mem.Allocator, info: ImageInfo, rgba: [
         return error.UnsupportedScanlinePad;
     }
 
-    // Lot of assumptions made here
     const pixels = try allocator.alloc(u8, rgba.len);
-    for (0..(rgba.len / 4)) |i| {
-        const red = (rgba[i * 4] | info.visual_type.red_mask);
-        const green = (rgba[i * 4 + 1] | info.visual_type.green_mask);
-        const blue = (rgba[i * 4 + 2] | info.visual_type.blue_mask);
-
-        const pixel: u32 = red | green | blue;
-
-        var buffer: [4]u8 = undefined;
-        std.mem.writeInt(u32, &buffer, pixel, .big);
-
-        pixels[i * 4] = buffer[0];
-        pixels[i * 4 + 1] = buffer[1];
-        pixels[i * 4 + 2] = buffer[2];
-        pixels[i * 4 + 3] = buffer[3];
+    var idx: usize = 0;
+    while (idx < rgba.len) : (idx += 4) {
+        pixels[idx] = rgba[idx + 2];
+        pixels[idx + 1] = rgba[idx + 1];
+        pixels[idx + 2] = rgba[idx];
+        pixels[idx + 3] = 0;
     }
 
     return pixels;
