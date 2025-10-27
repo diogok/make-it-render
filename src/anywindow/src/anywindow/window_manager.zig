@@ -12,6 +12,12 @@ pub const WindowManager = switch (builtin.os.tag) {
     else => @compileError("platform not supported"),
 };
 
+pub const Window = switch (builtin.os.tag) {
+    .linux => x11.X11Window,
+    .windows => windows.WindowsWindow,
+    else => @compileError("platform not supported"),
+};
+
 test "init" {
     var wm = try WindowManager.init(testing.allocator);
     defer wm.deinit();

@@ -14,7 +14,7 @@ pub fn main() !void {
         },
     );
 
-    log.debug("Time to window: {d}ms", .{timer.lap() / std.time.ns_per_ms});
+    timer.reset();
 
     const terminus = try textz.terminus.terminus(allocator, .@"16", .n);
     defer terminus.deinit();
@@ -23,27 +23,17 @@ pub fn main() !void {
     const unifont_jp = try textz.unifont.unifont_jp(allocator);
     defer unifont_jp.deinit();
 
-    const text = try textz.text.render(allocator, &[_]textz.common.Font{ terminus, unifont, unifont_jp }, "Hello, world!");
-    defer text.deinit();
-
     log.debug("Time to font: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
-    const text_pixels = try anywin.fns.bitsToColor(
-        allocator,
-        .{ 255, 128, 0 },
-        text.bitmap,
-    );
-    defer allocator.free(text_pixels);
+    var text_renderer = make_it_render.TextRenderer{ .fonts = &[_]textz.common.Font{ terminus, unifont, unifont_jp }, .allocator = allocator };
 
-    const text_image = anywin.Image{
-        .width = text.width,
-        .height = text.height,
-        .pixels = text_pixels,
-    };
+    var welcome_texts: [welcome.len]make_it_render.CreatedImage = undefined;
+    for (welcome, 0..) |txt, idx| {
+        welcome_texts[idx] = try text_renderer.textToImage(&window, txt);
+    }
 
-    const image_id = try window.createImage(text_image);
-
-    log.debug("Time to image: {d}ms", .{timer.lap() / std.time.us_per_ms});
+    var mouse_x: anywin.X = 0;
+    var mouse_y: anywin.Y = 0;
 
     try window.show();
     while (window.status == .open) {
@@ -54,22 +44,42 @@ pub fn main() !void {
             },
             .draw => {
                 timer.reset();
-                const target = anywin.BBox{
-                    .x = 100,
-                    .y = 100,
-                    .height = text_image.height,
-                    .width = text_image.width,
-                };
-                try window.draw(image_id, target);
+
+                for (welcome_texts, 0..) |txt, i| {
+                    const target = anywin.BBox{
+                        .x = 100,
+                        .y = 100 + (@as(u8, @truncate(i)) * 20),
+                        .height = txt.image.height,
+                        .width = txt.image.width,
+                    };
+                    try window.draw(txt.image_id, target);
+                }
+
                 log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.us_per_ms});
             },
             .mouse_pressed, .mouse_released, .key_pressed, .key_released => {
                 log.debug("{any}", .{event});
             },
+            .mouse_moved => |move| {
+                mouse_x = move.x;
+                mouse_y = move.y;
+            },
             else => {},
         }
     }
 }
+
+const welcome = [_][]const u8{
+    "Welcome",
+    "Bem vinda",
+    "καλως ΗΡΘΑΤΕ",
+    "أهلا بك",
+    "欢迎",
+    "ようこそ",
+    "Emojis 😀😺",
+    "café",
+    // TODO: LTR,
+};
 
 const std = @import("std");
 const make_it_render = @import("make_it_render");
@@ -82,6 +92,5 @@ const log = std.log.scoped(.demo);
 pub const std_options: std.Options = .{
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .x11, .level = .warn },
-        .{ .scope = .demo, .level = .debug },
     },
 };
