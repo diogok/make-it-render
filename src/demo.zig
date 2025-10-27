@@ -55,6 +55,20 @@ pub fn main() !void {
                     try window.draw(txt.image_id, target);
                 }
 
+                {
+                    const mouse_pos_txt = try std.fmt.allocPrint(allocator, "{d}x{d}", .{ mouse_x, mouse_y });
+                    defer allocator.free(mouse_pos_txt);
+                    const mouse_pos_img = try text_renderer.textToImage(&window, mouse_pos_txt);
+                    // TODO: defer destroy image?
+                    const target = anywin.BBox{
+                        .x = mouse_x - 20,
+                        .y = mouse_y - 20,
+                        .height = mouse_pos_img.image.height,
+                        .width = mouse_pos_img.image.width,
+                    };
+                    try window.draw(mouse_pos_img.image_id, target);
+                }
+
                 log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.us_per_ms});
             },
             .mouse_pressed, .mouse_released, .key_pressed, .key_released => {
@@ -63,6 +77,7 @@ pub fn main() !void {
             .mouse_moved => |move| {
                 mouse_x = move.x;
                 mouse_y = move.y;
+                try window.redraw();
             },
             else => {},
         }

@@ -262,6 +262,14 @@ pub const X11Window = struct {
         try x11.send(self.wm.conn, clear_area);
     }
 
+    pub fn redraw(self: *@This()) !void {
+        const clear_area = x11.proto.ClearArea{
+            .window_id = self.window_id,
+            .exposures = true,
+        };
+        try x11.send(self.wm.conn, clear_area);
+    }
+
     pub fn draw(self: *@This(), pixmap_id: common.ImageID, target: common.BBox) !void {
         const copy_area_req = x11.proto.CopyArea{
             .src_drawable_id = @truncate(pixmap_id),

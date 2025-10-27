@@ -158,6 +158,8 @@ pub const WindowsWindow = struct {
 
     pub fn clear(_: *@This()) !void {}
 
+    pub fn redraw(_: *@This()) !void {}
+
     pub fn draw(self: *@This(), imageID: common.ImageID, target: common.BBox) !void {
         var paint = std.mem.zeroes(win.Paint);
         const display = win.BeginPaint(self.handle, &paint);
