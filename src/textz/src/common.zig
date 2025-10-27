@@ -7,14 +7,17 @@ pub const Font = struct {
     width: u16 = 0,
     height: u16 = 0,
 
-    count: usize = 0,
+    count: u32 = 0,
+
+    buffer: []u8,
 
     pub fn deinit(self: @This()) void {
-        var iter = self.glyphs.valueIterator();
-        while (iter.next()) |glyph| {
-            self.allocator.free(glyph.bitmap);
-        }
-        self.glyphs.deinit();
+        //var iter = self.glyphs.valueIterator();
+        //while (iter.next()) |glyph| {
+        //self.allocator.free(glyph.bitmap);
+        //}
+        self.allocator.free(self.buffer);
+        self.glyphs.deinit(self.allocator);
         self.allocator.destroy(self.glyphs);
     }
 
@@ -30,7 +33,7 @@ pub const Font = struct {
     }
 };
 
-pub const GlyphMap = std.AutoHashMap(u32, Glyph);
+pub const GlyphMap = std.AutoHashMapUnmanaged(u32, Glyph);
 
 pub const Glyph = struct {
     encoding: u21,

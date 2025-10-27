@@ -1,10 +1,12 @@
 pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Font {
     const glyphs = try allocator.create(common.GlyphMap);
-    glyphs.* = common.GlyphMap.init(allocator);
+    glyphs.* = common.GlyphMap.empty;
 
     var font = common.Font{
         .allocator = allocator,
+        .reader = reader,
         .glyphs = glyphs,
+        .buffer = &[0]u8{},
     };
 
     var glyph = common.Glyph{
@@ -23,6 +25,8 @@ pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Font 
     var bitmap_started: bool = false;
     var bitmap_pos: usize = 0;
 
+    var buf_alloc: std.heap.FixedBufferAllocator = undefined;
+
     while (try reader.takeDelimiter('\n')) |line| {
         const trimmed = std.mem.trim(u8, line, " \t\r");
         var tokenizer = std.mem.tokenizeScalar(u8, trimmed, ' ');
@@ -34,8 +38,6 @@ pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Font 
             font.height = try std.fmt.parseInt(u16, tokenizer.next().?, 10);
         } else if (std.mem.eql(u8, prop, "FONT_ASCENT")) {
             font.ascent = try std.fmt.parseInt(u16, tokenizer.next().?, 10);
-        } else if (std.mem.eql(u8, prop, "CHARS")) {
-            font.count = try std.fmt.parseInt(usize, tokenizer.next().?, 10);
         } else if (std.mem.eql(u8, prop, "ENCODING")) {
             glyph.encoding = try std.fmt.parseInt(u21, tokenizer.next().?, 10);
         } else if (std.mem.eql(u8, prop, "DWIDTH")) {
@@ -49,14 +51,24 @@ pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Font 
             if (glyph.advance == 0) {
                 glyph.advance = glyph.bbox.width;
             }
+        } else if (std.mem.eql(u8, prop, "CHARS")) {
+            font.count = try std.fmt.parseInt(u32, tokenizer.next().?, 10);
+
+            // pre-allocate all bitmaps
+            font.buffer = try allocator.alloc(u8, font.count * font.width * font.height);
+            buf_alloc = std.heap.FixedBufferAllocator.init(font.buffer);
+
+            // ensure hashmap size
+            try font.glyphs.ensureTotalCapacity(allocator, font.count);
         } else if (std.mem.eql(u8, prop, "ENDCHAR")) {
             glyph.bitmap = bitmap;
-            try font.glyphs.put(glyph.encoding, glyph);
+            try font.glyphs.put(allocator, glyph.encoding, glyph);
             bitmap_started = false;
         } else if (std.mem.eql(u8, prop, "BITMAP")) {
             const bytes_per_row = (glyph.bbox.width + 7) / 8;
             const bitmap_size = @as(usize, glyph.bbox.height) * bytes_per_row * 8;
-            bitmap = try allocator.alloc(u1, bitmap_size);
+            //bitmap = try allocator.alloc(u1, bitmap_size);
+            bitmap = try buf_alloc.allocator().alloc(u1, bitmap_size);
 
             bitmap_started = true;
             bitmap_pos = 0;

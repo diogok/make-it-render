@@ -24,7 +24,6 @@ pub fn main() !void {
         text.bitmap,
     );
     defer allocator.free(text_pixels);
-    std.debug.print("pixels: {any}\n", .{text_pixels});
 
     const text_image = anywin.Image{
         .width = text.width,
