@@ -4,9 +4,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const TrueType = b.dependency("TrueType", .{ .target = target, .optimize = optimize });
-
-    const textz = b.addModule(
+    _ = b.addModule(
         "textz",
         .{
             .root_source_file = b.path("src/root.zig"),
@@ -15,7 +13,6 @@ pub fn build(b: *std.Build) void {
             .strip = optimize == .ReleaseSmall,
         },
     );
-    textz.addImport("TrueType", TrueType.module("TrueType"));
 
     const tests = b.addTest(.{
         .root_module = b.createModule(.{
