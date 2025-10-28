@@ -3,10 +3,6 @@
     .fingerprint = 0x67e9ab1ba3ca25d2,
     .version = "0.0.0",
     .dependencies = .{
-        .TrueType = .{
-            .url = "git+https://codeberg.org/andrewrk/TrueType.git#7543e2dca70267e8f09e37be00fbc0385138581d",
-            .hash = "TrueType-0.0.0-Ne-mWHIGAQBwHsiS9z_vbr1SkVZCkG01Vpzrs079dzIO",
-        },
     },
     .paths = .{
         "buid.zig",
