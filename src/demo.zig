@@ -131,7 +131,7 @@ pub fn main() !void {
                 );
 
                 // ask to redraw everything
-                try window.redraw();
+                try window.redraw(.{});
             },
             else => {},
         }

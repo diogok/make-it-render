@@ -230,16 +230,24 @@ pub const Window = struct {
         return Image.init(self, size, pixels);
     }
 
-    pub fn clear(self: *@This()) !void {
+    pub fn clear(self: *@This(), area: common.BBox) !void {
         const clear_area = x11.proto.ClearArea{
             .window_id = self.window_id,
+            .x = area.x,
+            .y = area.y,
+            .height = area.height,
+            .width = area.width,
         };
         try x11.send(self.wm.conn, clear_area);
     }
 
-    pub fn redraw(self: *@This()) !void {
+    pub fn redraw(self: *@This(), area: common.BBox) !void {
         const clear_area = x11.proto.ClearArea{
             .window_id = self.window_id,
+            .x = area.x,
+            .y = area.y,
+            .height = area.height,
+            .width = area.width,
             .exposures = true,
         };
         try x11.send(self.wm.conn, clear_area);
