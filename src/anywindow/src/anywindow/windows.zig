@@ -102,9 +102,14 @@ pub const Window = struct {
         return Image.init(self, size, pixels);
     }
 
-    pub fn clear(_: *@This(), _: common.BBox) !void {}
+    pub fn clear(self: *@This(), _: common.BBox) !void {
+        win.InvalidateRect(self.handle, null, true);
+    }
 
-    pub fn redraw(_: *@This(), _: common.BBox) !void {}
+    pub fn redraw(self: *@This(), _: common.BBox) !void {
+        _ = win.InvalidateRect(self.handle, null, false);
+        _ = win.UpdateWindow(self.handle);
+    }
 };
 
 pub const Image = struct {
