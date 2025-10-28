@@ -23,19 +23,44 @@ pub fn main() !void {
     const unifont_jp = try textz.unifont.unifont_jp(allocator);
     defer unifont_jp.deinit();
 
+    // pick some fonts, it will fallback until it finds a matching glyph
+    const fonts = &[_]textz.common.Font{ terminus, unifont, unifont_jp };
+
     log.debug("Time to font: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
-    var text_renderer = make_it_render.TextRenderer{ .fonts = &[_]textz.common.Font{ terminus, unifont, unifont_jp }, .allocator = allocator };
-
-    var welcome_texts: [welcome.len]make_it_render.CreatedImage = undefined;
+    // let's draw Welcome in a few languages
+    var welcome_imgs: [welcome.len]anywin.Image = undefined;
     for (welcome, 0..) |txt, idx| {
-        welcome_texts[idx] = try text_renderer.textToImage(&window, txt);
+        // get text bitmap
+        const text = try textz.render(allocator, fonts, txt);
+        defer text.deinit();
+
+        // set to pixels in color
+        const pixels = try make_it_render.glue.bitsToColor(
+            allocator,
+            .{ 255, 150, 0 },
+            text.bitmap,
+        );
+        defer allocator.free(pixels);
+
+        // create the image for each
+        welcome_imgs[idx] = try window.createImage(
+            .{
+                .height = text.height,
+                .width = text.width,
+            },
+            pixels,
+        );
     }
 
+    // let's keep track of mouse position to draw it
     var mouse_x: anywin.X = 0;
     var mouse_y: anywin.Y = 0;
+    var mouse_pos_img: ?anywin.Image = null;
 
+    // show the window now that we have all ready
     try window.show();
+
     while (window.status == .open) {
         const event = try wm.receive();
         switch (event) {
@@ -45,28 +70,26 @@ pub fn main() !void {
             .draw => {
                 timer.reset();
 
-                for (welcome_texts, 0..) |txt, i| {
+                // draw each welcome message
+                for (welcome_imgs, 0..) |img, i| {
                     const target = anywin.BBox{
                         .x = 100,
                         .y = 100 + (@as(u8, @truncate(i)) * 20),
-                        .height = txt.image.height,
-                        .width = txt.image.width,
+                        .height = img.size.height,
+                        .width = img.size.width,
                     };
-                    try window.draw(txt.image_id, target);
+                    try img.draw(target);
                 }
 
-                {
-                    const mouse_pos_txt = try std.fmt.allocPrint(allocator, "{d}x{d}", .{ mouse_x, mouse_y });
-                    defer allocator.free(mouse_pos_txt);
-                    const mouse_pos_img = try text_renderer.textToImage(&window, mouse_pos_txt);
-                    // TODO: defer destroy image?
+                // draw mouse position
+                if (mouse_pos_img) |img| {
                     const target = anywin.BBox{
                         .x = mouse_x - 20,
                         .y = mouse_y - 20,
-                        .height = mouse_pos_img.image.height,
-                        .width = mouse_pos_img.image.width,
+                        .height = img.size.height,
+                        .width = img.size.width,
                     };
-                    try window.draw(mouse_pos_img.image_id, target);
+                    try img.draw(target);
                 }
 
                 log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.us_per_ms});
@@ -77,6 +100,37 @@ pub fn main() !void {
             .mouse_moved => |move| {
                 mouse_x = move.x;
                 mouse_y = move.y;
+
+                if (mouse_pos_img) |img| {
+                    try img.deinit();
+                }
+
+                // fmt text
+                const mouse_pos_txt = try std.fmt.allocPrint(allocator, "{d}x{d}", .{ mouse_x, mouse_y });
+                defer allocator.free(mouse_pos_txt);
+
+                // render text
+                const mouse_pos_bitmap = try textz.render(allocator, fonts, mouse_pos_txt);
+                defer mouse_pos_bitmap.deinit();
+
+                // create pixels in color
+                const mouse_pos_pixels = try make_it_render.glue.bitsToColor(
+                    allocator,
+                    .{ 255, 150, 0 },
+                    mouse_pos_bitmap.bitmap,
+                );
+                defer allocator.free(mouse_pos_pixels);
+
+                // update the image
+                mouse_pos_img = try window.createImage(
+                    .{
+                        .height = mouse_pos_bitmap.height,
+                        .width = mouse_pos_bitmap.width,
+                    },
+                    mouse_pos_pixels,
+                );
+
+                // ask to redraw everything
                 try window.redraw();
             },
             else => {},
@@ -107,5 +161,6 @@ const log = std.log.scoped(.demo);
 pub const std_options: std.Options = .{
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .x11, .level = .warn },
+        .{ .scope = .demo, .level = .debug },
     },
 };

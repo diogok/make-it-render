@@ -27,12 +27,17 @@ pub const WindowStatus = enum {
     closed,
 };
 
-pub const Image = struct {
+pub const Size = struct {
     width: Width,
     height: Height,
-    /// RGBA pixels
-    pixels: []u8,
 };
+
+pub const Position = struct {
+    x: X = 0,
+    y: Y = 0,
+};
+
+pub const Pixels = []const u8;
 
 pub const Event = union(enum) {
     nop: void,

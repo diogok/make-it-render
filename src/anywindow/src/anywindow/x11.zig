@@ -1,6 +1,7 @@
 const std = @import("std");
 const x11 = @import("x11");
 const common = @import("common.zig");
+const log = std.log.scoped(.any_x11);
 
 const Atoms = struct {
     atom: u32,
@@ -225,8 +226,8 @@ pub const Window = struct {
         try x11.send(self.wm.conn, map_req);
     }
 
-    pub fn createImage(self: *@This(), image: common.Image) !Drawable {
-        return Drawable.init(self, image);
+    pub fn createImage(self: *@This(), size: common.Size, pixels: common.Pixels) !Image {
+        return Image.init(self, size, pixels);
     }
 
     pub fn clear(self: *@This()) !void {
@@ -245,19 +246,19 @@ pub const Window = struct {
     }
 };
 
-pub const Drawable = struct {
-    wm: *WindowManager,
+pub const Image = struct {
     window: *Window,
     image_id: u32,
+    size: common.Size,
 
-    pub fn init(window: *Window, image: common.Image) !@This() {
+    pub fn init(window: *Window, size: common.Size, pixels: common.Pixels) !@This() {
         const pixmap_id = try window.wm.xid.genID();
 
         const pixmap_req = x11.proto.CreatePixmap{
             .pixmap_id = pixmap_id,
             .drawable_id = window.window_id,
-            .width = image.width,
-            .height = image.height,
+            .width = size.width,
+            .height = size.height,
             .depth = window.depth,
         };
         try x11.send(window.wm.conn, pixmap_req);
@@ -265,40 +266,38 @@ pub const Drawable = struct {
         const self = @This(){
             .image_id = pixmap_id,
             .window = window,
-            .wm = window.wm,
+            .size = size,
         };
 
-        try self.update(image);
+        if (pixels.len > 0) {
+            try self.setPixels(pixels);
+        }
 
         return self;
     }
 
-    pub fn deinit(self: @This()) !void {
-        _ = self;
-    }
+    fn setPixels(self: @This(), pixels: common.Pixels) !void {
+        const image_info = x11.getImageInfo(self.window.wm.info, self.window.root);
 
-    pub fn update(self: @This(), image: common.Image) !void {
-        const image_info = x11.getImageInfo(self.wm.info, self.window.root);
-
-        const zpixmap = try x11.rgbaToZPixmapAlloc(self.wm.allocator, image_info, image.pixels);
-        defer self.wm.allocator.free(zpixmap);
+        const zpixmap = try x11.rgbaToZPixmapAlloc(self.window.wm.allocator, image_info, pixels);
+        defer self.window.wm.allocator.free(zpixmap);
 
         const put_image_req = x11.proto.PutImage{
             .drawable_id = self.image_id,
             .graphic_context_id = self.window.graphic_context_id,
-            .width = image.width,
-            .height = image.height,
+            .width = self.size.width,
+            .height = self.size.height,
             .x = 0,
             .y = 0,
             .depth = self.window.depth,
         };
 
-        try x11.sendWithBytes(self.wm.conn, put_image_req, zpixmap);
+        try x11.sendWithBytes(self.window.wm.conn, put_image_req, zpixmap);
     }
 
     pub fn draw(self: @This(), target: common.BBox) !void {
         const copy_area_req = x11.proto.CopyArea{
-            .src_drawable_id = @truncate(self.image_id),
+            .src_drawable_id = self.image_id,
             .dst_drawable_id = self.window.window_id,
             .graphic_context_id = self.window.graphic_context_id,
             .width = target.width,
@@ -306,6 +305,13 @@ pub const Drawable = struct {
             .dst_x = target.x,
             .dst_y = target.y,
         };
-        try x11.send(self.wm.conn, copy_area_req);
+        try x11.send(self.window.wm.conn, copy_area_req);
+    }
+
+    pub fn deinit(self: @This()) !void {
+        const free_image_req = x11.proto.FreePixmap{
+            .pixmap_id = self.image_id,
+        };
+        try x11.send(self.window.wm.conn, free_image_req);
     }
 };

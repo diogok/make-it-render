@@ -20,7 +20,7 @@ pub const Window = switch (builtin.os.tag) {
 
 pub const Image = switch (builtin.os.tag) {
     .linux => x11.Image,
-    .windows => windows.WindowsWindow,
+    .windows => windows.Image,
     else => @compileError("platform not supported"),
 };
 

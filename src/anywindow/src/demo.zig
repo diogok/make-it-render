@@ -23,14 +23,10 @@ pub fn main() !void {
         y, y, y, y, y,
         y, y, y, y, y,
     };
-    var pixels = std.mem.toBytes(yellow_block);
-    const src_image = win.Image{
-        .height = 5,
-        .width = 5,
-        .pixels = &pixels,
-    };
+    const pixels = std.mem.toBytes(yellow_block);
 
-    const image = try window.createImage(src_image);
+    const image = try window.createImage(.{ .height = 5, .width = 5 }, &pixels);
+    defer image.deinit() catch unreachable;
 
     while (window.status == .open) {
         const event = try wm.receive();
@@ -42,8 +38,8 @@ pub fn main() !void {
                 const target = win.BBox{
                     .x = 100,
                     .y = 100,
-                    .height = 5,
-                    .width = 5,
+                    .height = image.size.height,
+                    .width = image.size.width,
                 };
                 try image.draw(target);
             },
