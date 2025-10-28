@@ -1,11 +1,12 @@
-pub const wm = @import("anywindow/window_manager.zig");
+pub const any = @import("anywindow/any.zig");
 pub const common = @import("anywindow/common.zig");
 
-pub const WindowManager = wm.WindowManager;
-pub const Window = wm.Window;
+pub const WindowManager = any.WindowManager;
+pub const Window = any.Window;
+pub const Drawable = any.Drawable;
 
 pub const WindowID = common.WindowID;
-pub const ImageID = common.ImageID;
+pub const Image = common.Image;
 pub const Height = common.Height;
 pub const Width = common.Width;
 pub const X = common.X;
@@ -15,10 +16,9 @@ pub const MouseButton = common.MouseButton;
 pub const BBox = common.BBox;
 pub const WindowOptions = common.WindowOptions;
 pub const WindowStatus = common.WindowStatus;
-pub const Image = common.Image;
 pub const Event = common.Event;
 
 test {
-    _ = wm;
+    _ = any;
     _ = common;
 }

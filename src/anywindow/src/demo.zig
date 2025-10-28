@@ -11,22 +11,26 @@ pub fn main() !void {
             .title = "hello, world.",
         },
     );
+    try window.show();
 
-    var yellow_block: [5 * 5 * 4]u8 = undefined;
-    var byte_index: usize = 0;
-    while (byte_index < yellow_block.len) : (byte_index += 4) {
-        yellow_block[byte_index] = 255; // red
-        yellow_block[byte_index + 1] = 150; // green
-        yellow_block[byte_index + 2] = 0; // blue
-        yellow_block[byte_index + 3] = 0; // padding
-    }
-    const image = win.Image{
+    // Let's make a little yellow triangle
+    const y = [4]u8{ 255, 150, 0, 1 };
+    const b = [4]u8{ 0, 0, 0, 0 };
+    const yellow_block: [5 * 5][4]u8 = [_][4]u8{
+        b, b, y, b, b,
+        b, y, y, y, b,
+        b, y, y, y, b,
+        y, y, y, y, y,
+        y, y, y, y, y,
+    };
+    var pixels = std.mem.toBytes(yellow_block);
+    const src_image = win.Image{
         .height = 5,
         .width = 5,
-        .pixels = &yellow_block,
+        .pixels = &pixels,
     };
 
-    const image_id = try window.createImage(image);
+    const image = try window.createImage(src_image);
 
     while (window.status == .open) {
         const event = try wm.receive();
@@ -41,7 +45,7 @@ pub fn main() !void {
                     .height = 5,
                     .width = 5,
                 };
-                try window.draw(image_id, target);
+                try image.draw(target);
             },
             .mouse_pressed, .mouse_released, .key_pressed, .key_released => {
                 log.debug("{any}", .{event});
