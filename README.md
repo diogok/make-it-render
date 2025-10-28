@@ -1,43 +1,50 @@
 # Make it render
 
-Glue code and abstraction between X11, Windows and MacOS windows handling.
-
-Or the minimum it takes to render pixels on a desktop.
+This is a Zig library for cross-platform window and rendering, without dependencies.
 
 It is highly experimental and immature yet, with constant changes and bad performance.
 
-It does work, can render text to a window and receive input events.
-
 ## What is this
 
-This is a dependency-less Zig library for cross-platform window and rendering.
-
-It only uses C when linking to win32 required libraries.
-
-Produces small binaries, specially with 
+- Glue code and abstraction between X11, Windows and MacOS(soon) window handling
+- Support window management, input events and renderring
+- It only uses C when linking to win32 required libraries
+- Produces small binaries, but not super fast
+- Render text to pixels
 
 ## What this is not
 
-It is not a GUI library or game engine. 
+- It is not a GUI library or game engine
+- It does not use GPU (no opengl nor vulkan)
+- It does not support mobile (Android, iOS)
 
-It does not use GPU (no opengl or vulkan).
+## Structure
 
-It does not support mobile (Android, iOS).
+Each module is independent, and them there some "glue" modules to make it all work.
+
+- anywindow: Window handling abstraction
+	- macos
+	- x11
+	- windows
+- textz: Read fonts, get glyphs, work with unicode
+	- fonts: embed unifont and terminus
+	- bdf: BDF parsing
+- glue.zig: Join the above
 
 ## Work in progress
 
 Notably missing:
 
-- Performance (can barely hold 60fps on a raspberry pi 5)
-- Image drawing (like from PNGs)
-- Wayland support (works under X11 and XWayland)
-- MacOS support
+- Performance optimizations, can barely hold 60fps on a raspberry pi 5
+- Image drawing, like from PNGs
+- Wayland support, works under X11 and XWayland
+- MacOS support, I don't own a Mac
 
 ## Usage
 
 To do.
 
-See [src/demo.zig].
+See [src/demo.zig] for an example.
 
 ## License 
 
