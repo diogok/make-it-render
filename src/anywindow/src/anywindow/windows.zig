@@ -2,7 +2,7 @@ const std = @import("std");
 const win = @import("windows");
 const common = @import("common.zig");
 
-pub const WindowsWM = struct {
+pub const WindowManager = struct {
     allocator: std.mem.Allocator,
 
     instance: ?win.Instance,
@@ -36,8 +36,8 @@ pub const WindowsWM = struct {
         win.PostQuitMessage(0);
     }
 
-    pub fn createWindow(self: *@This(), options: common.WindowOptions) !WindowsWindow {
-        return try WindowsWindow.init(self, options);
+    pub fn createWindow(self: *@This(), options: common.WindowOptions) !Window {
+        return try Window.init(self, options);
     }
 
     pub fn receive(_: *@This()) !common.Event {
@@ -51,19 +51,15 @@ pub const WindowsWM = struct {
     }
 };
 
-var windowIDs: [256]?win.WindowHandle = undefined;
-
-pub const WindowsWindow = struct {
-    wm: *WindowsWM,
+pub const Window = struct {
+    wm: *WindowManager,
     handle: win.WindowHandle,
 
     title: [:0]u16,
 
     status: common.WindowStatus,
 
-    images: std.ArrayList(ImageHandler),
-
-    pub fn init(wm: *WindowsWM, options: common.WindowOptions) !@This() {
+    pub fn init(wm: *WindowManager, options: common.WindowOptions) !@This() {
         const title = try win.W(wm.allocator, options.title);
 
         const handle = win.CreateWindowExW(
@@ -89,12 +85,10 @@ pub const WindowsWindow = struct {
             .handle = handle.?,
             .status = .open,
             .title = title,
-            .images = std.ArrayList(ImageHandler).init(wm.allocator),
         };
     }
 
     pub fn destroy(self: *@This()) !void {
-        self.images.deinit();
         self.wm.allocator.free(self.title);
         self.status = .closed;
     }
@@ -104,14 +98,31 @@ pub const WindowsWindow = struct {
         while (win.ShowCursor(true) < 1) {}
     }
 
-    pub fn createImage(self: *@This(), img: common.Image) !common.ImageID {
-        const imageID = self.images.items.len;
+    pub fn createImage(self: *@This(), size: common.Size, pixels: common.Pixels) !Image {
+        return Image.init(self, size, pixels);
+    }
 
+    pub fn clear(_: *@This(), _: common.BBox) !void {}
+
+    pub fn redraw(_: *@This(), _: common.BBox) !void {}
+};
+
+pub const Image = struct {
+    window: *Window,
+
+    //image_id: u32,
+    size: common.Size,
+
+    bitmap: win.Bitmap,
+    frame: win.DeviceContext,
+    pixels: [*]u8,
+
+    pub fn init(window: *Window, size: common.Size, src_pixels: common.Pixels) !@This() {
         var pixels: [*]u8 = undefined;
         const bitmap_info = win.BitmapInfo{
             .header = .{
-                .width = img.width,
-                .height = img.height,
+                .width = size.width,
+                .height = size.height,
             },
         };
 
@@ -140,37 +151,36 @@ pub const WindowsWindow = struct {
 
         // RGB to BGR
         var i: usize = 0;
-        while (i < img.pixels.len) : (i += 4) {
-            pixels[i] = img.pixels[i + 2];
-            pixels[i + 1] = img.pixels[i + 1];
-            pixels[i + 2] = img.pixels[i];
-            pixels[i + 3] = img.pixels[i + 3];
+        while (i < src_pixels.len) : (i += 4) {
+            pixels[i] = src_pixels[i + 2];
+            pixels[i + 1] = src_pixels[i + 1];
+            pixels[i + 2] = src_pixels[i];
+            pixels[i + 3] = src_pixels[i + 3];
         }
 
-        const image = ImageHandler{
+        return @This(){
             .bitmap = bitmap.?,
             .frame = frame.?,
+            .window = window,
+            .size = size,
+            .pixels = pixels,
         };
-        try self.images.append(image);
-
-        return @truncate(imageID);
     }
 
-    pub fn clear(_: *@This()) !void {}
+    fn setPixels(self: @This(), pixels: common.Pixels) !void {
+        _ = self;
+        _ = pixels;
+    }
 
-    pub fn redraw(_: *@This()) !void {}
-
-    pub fn draw(self: *@This(), imageID: common.ImageID, target: common.BBox) !void {
+    pub fn draw(self: @This(), target: common.BBox) !void {
         var paint = std.mem.zeroes(win.Paint);
-        const display = win.BeginPaint(self.handle, &paint);
+        const display = win.BeginPaint(self.window.handle, &paint);
         if (display == null) {
             const err = win.GetLastError();
             std.debug.print("Beginpaint error: {any}\n", .{err});
             return error.ErrorBeginPaint;
         }
-        defer _ = win.EndPaint(self.handle, &paint);
-
-        const imageHandler = self.images.items[imageID];
+        defer _ = win.EndPaint(self.window.handle, &paint);
 
         const bitBltResult = win.BitBlt(
             display,
@@ -178,7 +188,7 @@ pub const WindowsWindow = struct {
             target.y,
             target.width,
             target.height,
-            imageHandler.frame,
+            self.frame,
             0,
             0,
             .SRCCOPY,
@@ -189,11 +199,8 @@ pub const WindowsWindow = struct {
             return error.ErrorBitBlt;
         }
     }
-};
 
-const ImageHandler = struct {
-    bitmap: win.Bitmap,
-    frame: win.DeviceContext,
+    pub fn deinit(_: @This()) !void {}
 };
 
 var event = [_]common.Event{
@@ -254,7 +261,7 @@ pub fn windowProc(
     message_type: win.MessageType,
     wparam: usize,
     lparam: isize,
-) callconv(.C) isize {
+) callconv(.winapi) isize {
     const windowID = @intFromPtr(window_handle);
     switch (message_type) {
         .WM_DESTROY => {

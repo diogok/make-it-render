@@ -8,13 +8,13 @@ const windows = @import("windows.zig");
 
 pub const WindowManager = switch (builtin.os.tag) {
     .linux => x11.WindowManager,
-    .windows => windows.WindowsWM,
+    .windows => windows.WindowManager,
     else => @compileError("platform not supported"),
 };
 
 pub const Window = switch (builtin.os.tag) {
     .linux => x11.Window,
-    .windows => windows.WindowsWindow,
+    .windows => windows.Window,
     else => @compileError("platform not supported"),
 };
 
