@@ -37,6 +37,12 @@ pub const WindowManager = struct {
 
 var class_count: usize = 0;
 
+/// RGB to BGR
+fn commonPixelToWinPixel(src: [3]u8) u32 {
+    const dst: [4]u8 = [4]u8{ 0, src[2], src[1], src[0] };
+    return std.mem.bytesToValue(u32, &dst);
+}
+
 pub const Window = struct {
     wm: *WindowManager,
     handle: win.WindowHandle,
@@ -61,7 +67,7 @@ pub const Window = struct {
             .instance = wm.instance,
             .class_name = class_name,
             .cursor = cursor,
-            .background = win.CreateSolidBrush(0x00000000),
+            .background = win.CreateSolidBrush(commonPixelToWinPixel(options.background)),
         };
 
         _ = win.RegisterClassExW(&window_class);

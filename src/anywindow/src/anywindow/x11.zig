@@ -128,6 +128,12 @@ pub const WindowManager = struct {
     }
 };
 
+/// RGB to BGR
+fn commonPixelToX11Pixel(src: [3]u8) u32 {
+    const dst: [4]u8 = [4]u8{ 1, src[2], src[1], src[0] };
+    return std.mem.bytesToValue(u32, &dst);
+}
+
 pub const Window = struct {
     window_id: u32,
     wm: *WindowManager,
@@ -152,7 +158,7 @@ pub const Window = struct {
             .PointerMotion,
         };
         const window_values = x11.proto.WindowValue{
-            .BackgroundPixel = wm.info.screens[0].black_pixel,
+            .BackgroundPixel = commonPixelToX11Pixel(options.background),
             .EventMask = x11.mask(&event_masks),
             .Colormap = wm.info.screens[0].colormap,
         };

@@ -20,6 +20,7 @@ pub const WindowOptions = struct {
     height: ?Height = null,
     x: ?X = null,
     y: ?Y = null,
+    background: [3]u8 = [3]u8{ 0, 0, 0 },
 };
 
 pub const WindowStatus = enum {
