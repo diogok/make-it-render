@@ -6,31 +6,14 @@ pub const WindowManager = struct {
     allocator: std.mem.Allocator,
 
     instance: ?win.Instance,
-    class_name: win.String,
 
     pub fn init(allocator: std.mem.Allocator) !@This() {
         const instance = win.GetModuleHandleW(null);
 
-        const class_name = win.W2("WindowClass");
-        const cursor = win.LoadCursorW(null, .Arrow);
-
-        const self = @This(){
+        return @This(){
             .allocator = allocator,
             .instance = instance,
-            .class_name = class_name,
         };
-
-        const window_class: win.WindowClass = .{
-            .style = @intFromEnum(win.ClassStyle.HREDRAW) | @intFromEnum(win.ClassStyle.VREDRAW),
-            .window_procedure = windowProc,
-            .instance = instance,
-            .class_name = class_name,
-            .cursor = cursor,
-            .background = win.CreateSolidBrush(0x00000000),
-        };
-
-        _ = win.RegisterClassExW(&window_class);
-        return self;
     }
 
     pub fn deinit(_: *@This()) void {
@@ -52,16 +35,37 @@ pub const WindowManager = struct {
     }
 };
 
+var class_count: usize = 0;
+
 pub const Window = struct {
     wm: *WindowManager,
     handle: win.WindowHandle,
     frame: win.DeviceContext,
+    class_name: [:0]u16,
 
     title: [:0]u16,
 
     status: common.WindowStatus,
 
     pub fn init(wm: *WindowManager, options: common.WindowOptions) !@This() {
+        const class_name_n = try std.fmt.allocPrint(wm.allocator, "WindowClass_{d}", .{class_count});
+        defer wm.allocator.free(class_name_n);
+        defer class_count += 1;
+
+        const class_name = try win.W(wm.allocator, class_name_n);
+        const cursor = win.LoadCursorW(null, .Arrow);
+
+        const window_class: win.WindowClass = .{
+            .style = @intFromEnum(win.ClassStyle.HREDRAW) | @intFromEnum(win.ClassStyle.VREDRAW),
+            .window_procedure = windowProc,
+            .instance = wm.instance,
+            .class_name = class_name,
+            .cursor = cursor,
+            .background = win.CreateSolidBrush(0x00000000),
+        };
+
+        _ = win.RegisterClassExW(&window_class);
+
         const frame_handle = win.CreateCompatibleDC(null);
         if (frame_handle == null) {
             const err = win.GetLastError();
@@ -72,7 +76,7 @@ pub const Window = struct {
 
         const handle = win.CreateWindowExW(
             win.ExtendedWindowStyle.OverlappedWindow,
-            wm.class_name,
+            class_name,
             title,
             win.WindowStyle.OverlappedWindow,
             options.x orelse win.UseDefault,
@@ -94,11 +98,13 @@ pub const Window = struct {
             .frame = frame_handle.?,
             .status = .open,
             .title = title,
+            .class_name = class_name,
         };
     }
 
     pub fn destroy(self: *@This()) !void {
         self.wm.allocator.free(self.title);
+        self.wm.allocator.free(self.class_name);
         self.status = .closed;
     }
 
