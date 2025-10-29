@@ -69,6 +69,7 @@ pub fn main() !void {
             },
             .draw => {
                 timer.reset();
+                try window.clear(.{});
 
                 // draw each welcome message
                 for (welcome_imgs, 0..) |img, i| {

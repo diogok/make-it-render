@@ -286,7 +286,13 @@ pub extern "user32" fn UpdateWindow(
 
 pub extern "dwmapi" fn DwmFlush() callconv(.winapi) isize;
 
-pub extern "user32" fn InvalidateRect(
+pub extern "gdi32" fn InvalidateRect(
+    window_handle: ?WindowHandle,
+    rect: ?*Rect,
+    erase: bool,
+) callconv(.winapi) bool;
+
+pub extern "gdi32" fn GetUpdateRect(
     window_handle: ?WindowHandle,
     rect: ?*Rect,
     erase: bool,
@@ -311,7 +317,7 @@ pub extern "user32" fn ReleaseDC(
     handle: ?DeviceContext,
 ) callconv(.winapi) c_int;
 
-pub extern "user32" fn BitBlt(
+pub extern "gdi32" fn BitBlt(
     dstHDC: ?DeviceContext,
     dstX: i32,
     dstY: i32,
@@ -325,6 +331,10 @@ pub extern "user32" fn BitBlt(
 
 pub extern "gdi32" fn CreateCompatibleDC(
     handle: ?DeviceContext,
+) callconv(.winapi) ?DeviceContext;
+
+pub extern "gdi32" fn GetWindowDC(
+    handle: ?WindowHandle,
 ) callconv(.winapi) ?DeviceContext;
 
 pub extern "user32" fn SelectObject(
@@ -344,6 +354,14 @@ pub extern "gdi32" fn CreateDIBSection(
     hSection: ?*anyopaque,
     offset: u32,
 ) callconv(.winapi) ?Bitmap;
+
+pub extern "user32" fn GetSysColorBrush(
+    index: i32,
+) callconv(.winapi) ?BrushHandler;
+
+pub extern "gdi32" fn CreateSolidBrush(
+    color: u32,
+) callconv(.winapi) ?BrushHandler;
 
 pub const DeviceContext = *anyopaque;
 pub const Bitmap = *anyopaque;

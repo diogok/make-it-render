@@ -26,6 +26,7 @@ pub const WindowManager = struct {
             .instance = instance,
             .class_name = class_name,
             .cursor = cursor,
+            .background = win.CreateSolidBrush(0x00000000),
         };
 
         _ = win.RegisterClassExW(&window_class);
@@ -54,12 +55,19 @@ pub const WindowManager = struct {
 pub const Window = struct {
     wm: *WindowManager,
     handle: win.WindowHandle,
+    frame: win.DeviceContext,
 
     title: [:0]u16,
 
     status: common.WindowStatus,
 
     pub fn init(wm: *WindowManager, options: common.WindowOptions) !@This() {
+        const frame_handle = win.CreateCompatibleDC(null);
+        if (frame_handle == null) {
+            const err = win.GetLastError();
+            log.err("CreateCompatibleDC error: {any}", .{err});
+            return error.NoCompatibleDC;
+        }
         const title = try win.W(wm.allocator, options.title);
 
         const handle = win.CreateWindowExW(
@@ -83,6 +91,7 @@ pub const Window = struct {
         return @This(){
             .wm = wm,
             .handle = handle.?,
+            .frame = frame_handle.?,
             .status = .open,
             .title = title,
         };
@@ -103,12 +112,13 @@ pub const Window = struct {
     }
 
     pub fn clear(self: *@This(), _: common.BBox) !void {
-        win.InvalidateRect(self.handle, null, true);
+        _ = win.InvalidateRect(self.handle, null, true);
     }
 
     pub fn redraw(self: *@This(), _: common.BBox) !void {
-        _ = win.InvalidateRect(self.handle, null, false);
-        _ = win.UpdateWindow(self.handle);
+        _ = self; // autofix
+        //_ = win.InvalidateRect(self.handle, null, false);
+        //_ = win.UpdateWindow(self.handle);
     }
 };
 
@@ -119,7 +129,6 @@ pub const Image = struct {
     size: common.Size,
 
     bitmap: win.Bitmap,
-    frame: win.DeviceContext,
     pixels: [*]u8,
 
     pub fn init(window: *Window, size: common.Size, src_pixels: common.Pixels) !@This() {
@@ -127,7 +136,7 @@ pub const Image = struct {
         const bitmap_info = win.BitmapInfo{
             .header = .{
                 .width = size.width,
-                .height = size.height,
+                .height = @as(i32, size.height) * -1,
             },
         };
 
@@ -141,18 +150,11 @@ pub const Image = struct {
         );
         if (bitmap == null) {
             const err = win.GetLastError();
-            std.debug.print("CreateDIBSection error: {any}\n", .{err});
+            log.err("CreateDIBSection error: {any}", .{err});
             return error.ErrorCreatingImage;
         }
 
-        const frame = win.CreateCompatibleDC(null);
-        if (frame == null) {
-            const err = win.GetLastError();
-            std.debug.print("CreateCompatibleDC error: {any}\n", .{err});
-            return error.ErrorCreatingCompatibleDeviceContext;
-        }
-
-        _ = win.SelectObject(frame, bitmap);
+        //_ = win.SelectObject(window.frame, bitmap);
 
         // RGB to BGR
         var i: usize = 0;
@@ -165,7 +167,6 @@ pub const Image = struct {
 
         return @This(){
             .bitmap = bitmap.?,
-            .frame = frame.?,
             .window = window,
             .size = size,
             .pixels = pixels,
@@ -178,14 +179,16 @@ pub const Image = struct {
     }
 
     pub fn draw(self: @This(), target: common.BBox) !void {
-        var paint = std.mem.zeroes(win.Paint);
-        const display = win.BeginPaint(self.window.handle, &paint);
-        if (display == null) {
-            const err = win.GetLastError();
-            std.debug.print("Beginpaint error: {any}\n", .{err});
-            return error.ErrorBeginPaint;
+        _ = win.SelectObject(self.window.frame, self.bitmap);
+
+        const display = win.GetWindowDC(self.window.handle);
+        defer {
+            const released = win.ReleaseDC(self.window.handle, display);
+            if (released != 1) {
+                const err = win.GetLastError();
+                log.err("ReleaseDC error: {any}", .{err});
+            }
         }
-        defer _ = win.EndPaint(self.window.handle, &paint);
 
         const bitBltResult = win.BitBlt(
             display,
@@ -193,19 +196,22 @@ pub const Image = struct {
             target.y,
             target.width,
             target.height,
-            self.frame,
+            self.window.frame,
             0,
             0,
             .SRCCOPY,
         );
         if (!bitBltResult) {
             const err = win.GetLastError();
-            std.debug.print("BitBlt error: {any}", .{err});
+            log.err("BitBlt error: {any}", .{err});
             return error.ErrorBitBlt;
         }
+        //_ = win.DwmFlush(); // wait for vsync, kinda
     }
 
-    pub fn deinit(_: @This()) !void {}
+    pub fn deinit(self: @This()) !void {
+        _ = win.DeleteObject(self.bitmap);
+    }
 };
 
 var event = [_]common.Event{
@@ -274,7 +280,14 @@ pub fn windowProc(
             event[active].close = windowID;
         },
         .WM_PAINT => {
-            active = 2;
+            var rect: win.Rect = std.mem.zeroes(win.Rect);
+            _ = win.GetUpdateRect(window_handle, &rect, false);
+
+            if (rect.left != 0 or rect.right != 0 or rect.top != 0 or rect.bottom != 0) {
+                active = 2;
+                event[active].draw.window_id = windowID;
+            }
+            _ = win.DwmFlush(); // wait for vsync, kinda
         },
         .WM_LBUTTONDOWN => {
             active = 3;
@@ -360,6 +373,12 @@ pub fn windowProc(
         .WM_MOUSEMOVE => {
             active = 5;
 
+            const x = win.loword(lparam);
+            const y = win.hiword(lparam);
+
+            event[active].mouse_moved.x = @intCast(x);
+            event[active].mouse_moved.y = @intCast(y);
+
             event[active].mouse_moved.window_id = windowID;
         },
         .WM_KEYDOWN => {
@@ -385,3 +404,5 @@ pub fn windowProc(
     }
     return 0;
 }
+
+const log = std.log.scoped(.any_win32);

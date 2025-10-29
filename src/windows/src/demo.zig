@@ -34,6 +34,7 @@ pub fn main() !void {
         .instance = instance,
         .class_name = class_name,
         .cursor = cursor,
+        .background = win.CreateSolidBrush(0x00000000),
     };
 
     // Register the class to use later to create the window.
@@ -95,8 +96,6 @@ pub fn main() !void {
 
 var pixels: [*]u8 = undefined;
 var bitmap: ?win.Bitmap = null;
-var width: i32 = 0;
-var height: i32 = 0;
 
 /// Function to process messages, input and draw.
 pub fn windowProc(
@@ -106,12 +105,40 @@ pub fn windowProc(
     lparam: isize,
 ) callconv(.winapi) isize {
     switch (message_type) {
-        .WM_CREATE => {},
+        .WM_CREATE => {
+            // recrete our frame when the window resizes
+            const bitmap_info = win.BitmapInfo{
+                .header = .{
+                    .width = 50,
+                    .height = 50,
+                },
+            };
+
+            // create a new frame
+            bitmap = win.CreateDIBSection(
+                null,
+                &bitmap_info,
+                .RGB_COLORS,
+                &pixels,
+                null,
+                0,
+            );
+            if (bitmap == null) {
+                const err = win.GetLastError();
+                log.err("CreateDIBSection error: {any}", .{err});
+                return 0;
+            }
+
+            // select this bitmap on our frame_handle
+            _ = win.SelectObject(frame_handle, bitmap);
+        },
         .WM_DESTROY => {
             win.PostQuitMessage(0);
         },
         .WM_PAINT => {
             while (win.ShowCursor(true) < 1) {}
+            var timer = std.time.Timer.start() catch unreachable;
+
             // The paint struct will receive paint specs from BeginPaint.
             var paint = std.mem.zeroes(win.Paint);
             // BeginPain will fill in Paint struct and give us somewhere to draw to.
@@ -126,7 +153,9 @@ pub fn windowProc(
             // Paint it red.
             // BGRA
             var i: usize = 0;
-            while (i < (height * width) * 4) : (i += 4) {
+            const h: usize = 50;
+            const w: usize = 50;
+            while (i < (h * w) * 4) : (i += 4) {
                 pixels[i] = 0;
                 pixels[i + 1] = 0;
                 pixels[i + 2] = 255;
@@ -153,46 +182,15 @@ pub fn windowProc(
             }
 
             _ = win.DwmFlush(); // wait for vsync, kinda
+            log.debug("PAINT TIME {d}ms", .{timer.lap() / std.time.ns_per_ms});
         },
-        .WM_SIZE => {
-            // extract size from param
-            width = win.loword(lparam);
-            height = win.hiword(lparam);
-
-            // recrete our frame when the window resizes
-            const bitmap_info = win.BitmapInfo{
-                .header = .{
-                    .width = width,
-                    .height = height * -1,
-                },
-            };
-
-            // delete existing bitmap if it is set.
-            if (bitmap != null) _ = win.DeleteObject(bitmap);
-
-            // create a new frame
-            bitmap = win.CreateDIBSection(
-                null,
-                &bitmap_info,
-                .RGB_COLORS,
-                &pixels,
-                null,
-                0,
-            );
-            if (bitmap == null) {
-                const err = win.GetLastError();
-                log.err("CreateDIBSection error: {any}", .{err});
-                return 0;
-            }
-
-            // select this bitmap on our frame_handle
-            _ = win.SelectObject(frame_handle, bitmap);
-        },
+        .WM_SIZE => {},
         .WM_MOUSEMOVE => {
             // probably wrong for multimonitor it seems
             const x = win.loword(lparam);
             const y = win.hiword(lparam);
             log.debug("Mouse at {d}x{d}", .{ x, y });
+            _ = win.UpdateWindow(window_handle);
         },
         .WM_LBUTTONDOWN => {
             const x = win.loword(lparam);
