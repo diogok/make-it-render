@@ -10,14 +10,16 @@ pub const RGBA = packed struct {
     alpha: Intensity = 0,
 };
 
+pub const Pixels = []const RGBA;
+
 // size on the Y coordinates
 pub const Height = u16;
 // size on the X coordinates
 pub const Width = u16;
 // Y represents vertical coordinates
-pub const X = u16;
+pub const X = i16;
 // X represents horizontal coordinates
-pub const Y = u16;
+pub const Y = i16;
 
 pub const Point = packed struct {
     x: X,

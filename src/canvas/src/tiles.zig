@@ -1,9 +1,3 @@
-const std = @import("std");
-const testing = std.testing;
-
-const types = @import("types.zig");
-const BBox = @import("bbox.zig").BBox;
-
 pub const Tile = struct {
     area: BBox,
     // pixels of the tile
@@ -13,7 +7,7 @@ pub const Tile = struct {
         allocator: std.mem.Allocator,
         area: BBox,
     ) !@This() {
-        const pixels = try allocator.alloc(types.RGBA, area.size.width * area.size.height);
+        const pixels = try allocator.alloc(types.RGBA, @as(usize, @intCast(area.size.width)) * @as(usize, @intCast(area.size.height)));
         for (pixels, 0..) |_, i| {
             pixels[i] = std.mem.zeroes(types.RGBA);
         }
@@ -53,7 +47,7 @@ pub const Tile = struct {
 };
 
 fn indexFromPoint(width: types.Width, point: types.Point) usize {
-    return point.y * width + point.x;
+    return @abs(point.y) * width + @abs(point.x);
 }
 
 test "find index from point" {
@@ -148,6 +142,21 @@ pub const TileMap = struct {
         self.tiles.deinit(self.allocator);
     }
 
+    pub fn setPixels(self: *@This(), area: BBox, pixels: []const types.RGBA) !void {
+        var y: i16 = 0;
+        while (y < area.size.height) : (y += 1) {
+            var x: i16 = 0;
+            while (x < area.size.width) : (x += 1) {
+                const point = types.Point{ .x = x, .y = y };
+                const index = indexFromPoint(area.size.width, point);
+                const pixel = pixels[index];
+                if (pixel.green > 0 or pixel.red > 0 or pixel.blue > 0 or pixel.alpha > 0) {
+                    try self.setPixel(point, pixel);
+                }
+            }
+        }
+    }
+
     pub fn setPixel(self: *@This(), point: types.Point, color: types.RGBA) !void {
         for (self.tiles.items) |tile| {
             if (tile.maybeSetPixel(point, color)) {
@@ -171,11 +180,11 @@ pub const TileMap = struct {
     }
 
     fn tileOriginForPoint(self: *@This(), point: types.Point) types.Point {
-        const a = @divFloor(point.x, self.tile_size.height);
-        const x = (a * self.tile_size.height);
+        const a = @divFloor(point.x, @as(i16, @intCast(self.tile_size.height)));
+        const x = (a * @as(i16, @intCast(self.tile_size.height)));
 
-        const b = @divFloor(point.y, self.tile_size.width);
-        const y = (b * self.tile_size.width);
+        const b = @divFloor(point.y, @as(i16, @intCast(self.tile_size.width)));
+        const y = (b * @as(i16, @intCast(self.tile_size.width)));
 
         return types.Point{
             .x = x,
@@ -217,7 +226,7 @@ pub const TileAreaIterator = struct {
 
     pub fn next(self: *@This()) ?Tile {
         while (self.pos < self.tiles.len) : (self.pos += 1) {
-            if (self.tiles[self.pos].overlaps(self.bbox)) {
+            if (self.tiles[self.pos].overlaps(self.bbox) or self.bbox.isEmpty()) {
                 const tile = self.tiles[self.pos];
                 self.pos += 1;
                 return tile;
@@ -268,3 +277,55 @@ test "Basic tile map" {
     const tile2 = iter.next();
     try testing.expect(tile2 == null);
 }
+
+test "Draw pixels tile map" {
+    var tiles = TileMap.init(testing.allocator, .{ .width = 2, .height = 2 });
+    defer tiles.deinit();
+
+    const pixels = &[_]types.RGBA{
+        .{}, .{},            .{}, .{},              .{},
+        .{}, .{ .red = 99 }, .{}, .{},              .{},
+        .{}, .{},            .{}, .{},              .{},
+        .{}, .{},            .{}, .{ .green = 10 }, .{},
+        .{}, .{},            .{}, .{},              .{},
+    };
+    const pixels_box = BBox{
+        .origin = .{
+            .x = 0,
+            .y = 0,
+        },
+        .size = .{
+            .width = 5,
+            .height = 5,
+        },
+    };
+    try tiles.setPixels(pixels_box, pixels);
+
+    var iter = tiles.areaIterator(pixels_box);
+
+    const expected0 = &[_]types.RGBA{
+        .{}, .{},
+        .{}, .{ .red = 99 },
+    };
+
+    const tile0 = iter.next();
+    try testing.expect(tile0 != null);
+    try testing.expectEqualSlices(types.RGBA, expected0, tile0.?.pixels);
+
+    const expected1 = &[_]types.RGBA{
+        .{}, .{},
+        .{}, .{ .green = 10 },
+    };
+    const tile1 = iter.next();
+    try testing.expect(tile1 != null);
+    try testing.expectEqualSlices(types.RGBA, expected1, tile1.?.pixels);
+
+    const tile2 = iter.next();
+    try testing.expect(tile2 == null);
+}
+
+const std = @import("std");
+const testing = std.testing;
+
+const types = @import("types.zig");
+const BBox = @import("bbox.zig").BBox;

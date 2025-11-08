@@ -2,26 +2,24 @@ pub const BBox = struct {
     origin: types.Point,
     size: types.Size,
 
+    pub const empty = BBox{
+        .origin = .{ .x = 0, .y = 0 },
+        .size = .{ .width = 0, .height = 0 },
+    };
+
     pub fn containsPoint(self: @This(), point: types.Point) bool {
         return point.x >= self.origin.x and
-            point.x < self.maxWidth() and
+            point.x < self.maxX() and
             point.y >= self.origin.y and
-            point.y < self.maxHeight();
+            point.y < self.maxY();
     }
 
     pub fn maxY(self: @This()) types.Y {
-        return self.origin.y + self.size.height;
+        return self.origin.y + @as(i16, @intCast(self.size.height));
     }
 
     pub fn maxX(self: @This()) types.X {
-        return self.origin.x + self.size.width;
-    }
-    pub fn maxHeight(self: @This()) types.Height {
-        return self.origin.y + self.size.height;
-    }
-
-    pub fn maxWidth(self: @This()) types.Width {
-        return self.origin.x + self.size.width;
+        return self.origin.x + @as(i16, @intCast(self.size.width));
     }
 
     pub fn internalPoint(self: @This(), point: types.Point) types.Point {
@@ -36,6 +34,10 @@ pub const BBox = struct {
             other.origin.x < self.maxX() and
             self.origin.y < other.maxY() and
             other.origin.y < self.maxY();
+    }
+
+    pub fn isEmpty(self: @This()) bool {
+        return self.origin.x == 0 and self.origin.y == 0 and self.size.height == 0 and self.size.width == 0;
     }
 };
 
