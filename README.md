@@ -35,6 +35,8 @@ Each module is independent, and them there some "glue" modules to make it all wo
 
 Notably missing:
 
+- Fix differences between mouse position and keys between windows and linux
+- Fullscreen windows and back
 - Performance optimizations, can barely hold 60fps on a raspberry pi 5
 - Image drawing, like from PNGs
 - Wayland support, works under X11 and XWayland
