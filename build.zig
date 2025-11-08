@@ -20,6 +20,9 @@ pub fn build(b: *std.Build) void {
     const textz = b.dependency("textz", .{ .target = target, .optimize = optimize });
     make_it_render.addImport("textz", textz.module("textz"));
 
+    const canvas = b.dependency("canvas", .{ .target = target, .optimize = optimize });
+    make_it_render.addImport("canvas", canvas.module("canvas"));
+
     {
         const demo_mod = b.addModule("demo", .{
             .root_source_file = b.path("src/demo.zig"),

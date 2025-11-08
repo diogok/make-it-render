@@ -9,6 +9,9 @@
         .textz = .{
             .path = "src/textz",
         },
+        .canvas = .{
+            .path = "src/canvas",
+        },
     },
     .paths = .{
         "src",
