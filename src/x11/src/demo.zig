@@ -172,6 +172,8 @@ pub fn main() !void {
 
     // === Main loop === //
 
+    var timer = try std.time.Timer.start();
+
     // Now we have the main loop
     // Here we receive events and send draw requests
     var open = true;
@@ -179,6 +181,7 @@ pub fn main() !void {
         while (try x11.receive(conn)) |message| {
             switch (message) {
                 .Expose => {
+                    timer.reset();
                     // Expose means we need to draw to the window
                     // It also include the area we need to draw to
 
@@ -202,6 +205,8 @@ pub fn main() !void {
                         .dst_y = 200,
                     };
                     try x11.send(conn, copy_area_req);
+
+                    log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.us_per_ms});
                 },
                 .ClientMessage => |client_message| {
                     // ClientMessage is how other X11 clients communicate
@@ -222,3 +227,12 @@ pub fn main() !void {
     try x11.send(conn, x11.proto.UnmapWindow{ .window_id = window_id });
     try x11.send(conn, x11.proto.DestroyWindow{ .window_id = window_id });
 }
+
+const log = std.log.scoped(.demo);
+
+pub const std_options: std.Options = .{
+    .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .x11, .level = .warn },
+        .{ .scope = .demo, .level = .debug },
+    },
+};

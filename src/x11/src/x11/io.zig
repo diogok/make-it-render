@@ -9,10 +9,12 @@ const testing = std.testing;
 const log = std.log.scoped(.x11);
 
 pub fn send(conn: std.net.Stream, request: anytype) !void {
-    var write_buffer: [64]u8 = undefined;
-    var conn_writer = conn.writer(&write_buffer);
-    const writer = &conn_writer.interface;
-    return write(writer, request);
+    //var write_buffer: [64]u8 = undefined;
+    //var conn_writer = conn.writer(&write_buffer);
+    //const writer = &conn_writer.interface;
+    //return write(writer, request);
+    const req_bytes: []const u8 = &std.mem.toBytes(request);
+    _ = std.posix.send(conn.handle, req_bytes, 0) catch unreachable;
 }
 
 /// Send a request to a socket.
@@ -28,35 +30,26 @@ pub fn sendWithBytes(conn: std.net.Stream, request: anytype, bytes: []const u8) 
     var write_buffer: [64]u8 = undefined;
     var conn_writer = conn.writer(&write_buffer);
     const writer = &conn_writer.interface;
-    return writeWithBytes(writer, request, bytes);
+    //return writeWithBytes(writer, request, bytes);
+
+    var reader = std.Io.Reader.fixed(bytes);
+
+    return stream(writer, request, &reader, bytes.len);
 }
 
 /// Send a request to a socket with some extra bytes at the end.
 /// It re-calculate the propriate length and add neded padding.
 /// Use with Request structs from proto namespace that require additional data to be sent.
 pub fn writeWithBytes(writer: *std.Io.Writer, request: anytype, bytes: []const u8) !void {
-    var req_bytes = std.mem.toBytes(request);
-
-    // re-calc length to include extra data
-
-    // get length including the request, extra bytes and padding needed
-    const length = get_padded_len(request, bytes);
-    // bytes 3 and 4 (a u16) of a request is always length, we can override it to include the total size
-    const len_bytes = std.mem.toBytes(length);
-    req_bytes[2] = len_bytes[0];
-    req_bytes[3] = len_bytes[1];
-
-    log.debug("Sending (size: {d}): {any}", .{ req_bytes.len, request });
-    log.debug("Sending extra bytes len  {d}", .{bytes.len});
-
     // send request with overriden length
+    const req_bytes = request_bytes_fixed_len(request, bytes.len);
     try writer.writeAll(&req_bytes);
 
     // write extra bytes
     try writer.writeAll(bytes);
 
     // calculate padding and send it
-    const pad_len = get_pad_len(bytes);
+    const pad_len = get_pad_len(bytes.len);
     const padding: [3]u8 = .{ 0, 0, 0 };
     const pad = padding[0..pad_len];
     try writer.writeAll(pad);
@@ -64,11 +57,53 @@ pub fn writeWithBytes(writer: *std.Io.Writer, request: anytype, bytes: []const u
     try writer.flush();
 }
 
+pub fn sendFromReader(conn: std.net.Stream, request: anytype, reader: *std.Io.Reader, len: usize) !void {
+    var write_buffer: [64]u8 = undefined;
+    var conn_writer = conn.writer(&write_buffer);
+    const writer = &conn_writer.interface;
+    return stream(writer, request, reader, len);
+}
+
+pub fn stream(writer: *std.Io.Writer, request: anytype, reader: *std.Io.Reader, len: usize) !void {
+    // send request with overriden length
+    const req_bytes = request_bytes_fixed_len(request, len);
+    try writer.writeAll(&req_bytes);
+
+    // write extra bytes
+    _ = try reader.stream(writer, .unlimited);
+
+    // calculate padding and send it
+    const pad_len = get_pad_len(len);
+    const padding: [3]u8 = .{ 0, 0, 0 };
+    const pad = padding[0..pad_len];
+    try writer.writeAll(pad);
+
+    try writer.flush();
+}
+
+fn request_bytes_fixed_len(request: anytype, bytes_len: usize) [@sizeOf(@TypeOf(request))]u8 {
+    var req_bytes = std.mem.toBytes(request);
+
+    // re-calc length to include extra data
+
+    // get length including the request, extra bytes and padding needed
+    const length = get_padded_len(request, bytes_len);
+    // bytes 3 and 4 (a u16) of a request is always length, we can override it to include the total size
+    const len_bytes = std.mem.toBytes(length);
+    req_bytes[2] = len_bytes[0];
+    req_bytes[3] = len_bytes[1];
+
+    log.debug("Sending (size: {d}): {any}", .{ req_bytes.len, request });
+    log.debug("Sending extra bytes len  {d}", .{bytes_len});
+
+    return req_bytes;
+}
+
 /// Return total length, including padding, that is need for whole data to be a multiple of 4.
-fn get_padded_len(request: anytype, bytes: []const u8) u16 {
+fn get_padded_len(request: anytype, src_bytes_len: usize) u16 {
     const req_len: u16 = @sizeOf(@TypeOf(request)) / 4; // size of core request
-    const bytes_len: u16 = @intCast(bytes.len); // size of extra bytes
-    const pad_len: u16 = get_pad_len(bytes); // size of padding
+    const bytes_len: u16 = @intCast(src_bytes_len); // size of extra bytes
+    const pad_len: u16 = get_pad_len(bytes_len); // size of padding
     const extra_len: u16 = (bytes_len + pad_len) / 4; // total extra len (bytes + padding)
     const length: u16 = req_len + extra_len; // total request length
     return length;
@@ -85,26 +120,25 @@ test "Length calc" {
 }
 
 /// Get how much padding is needed for the extra bytes to be multiple of 4.
-fn get_pad_len(bytes: []const u8) u16 {
-    const missing = bytes.len % 4;
+fn get_pad_len(bytes_len: usize) u16 {
+    const missing = bytes_len % 4;
     if (missing == 0) {
         return 0;
     }
-    const pad: u16 = @intCast(4 - missing);
-    return pad;
+    return @as(u16, @intCast(4 - missing));
 }
 
 test "padding length" {
-    const len0 = get_pad_len("");
+    const len0 = get_pad_len("".len);
     try testing.expectEqual(0, len0);
 
-    const len1 = get_pad_len("1234");
+    const len1 = get_pad_len("1234".len);
     try testing.expectEqual(0, len1);
 
-    const len2 = get_pad_len("12345");
+    const len2 = get_pad_len("12345".len);
     try testing.expectEqual(3, len2);
 
-    const len3 = get_pad_len("12345678");
+    const len3 = get_pad_len("12345678".len);
     try testing.expectEqual(0, len3);
 }
 

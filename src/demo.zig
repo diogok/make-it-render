@@ -2,6 +2,7 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() != .leak);
     const allocator = gpa.allocator();
+    //const allocator = std.heap.smp_allocator;
 
     var timer = try std.time.Timer.start();
 
@@ -28,9 +29,12 @@ pub fn main() !void {
 
     log.debug("Time to font: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
+    var tiles = canvas.tiles.TileMap.init(allocator, .{ .height = 256, .width = 256 });
+    defer tiles.deinit();
+
     // let's draw Welcome in a few languages
-    var welcome_imgs: [welcome.len]anywin.Image = undefined;
-    for (welcome, 0..) |txt, idx| {
+    //var welcome_imgs: [welcome.len]anywin.Image = undefined;
+    for (welcome, 0..) |txt, i| {
         // get text bitmap
         const text = try textz.render(allocator, fonts, txt);
         defer text.deinit();
@@ -44,12 +48,18 @@ pub fn main() !void {
         defer allocator.free(pixels);
 
         // create the image for each
-        welcome_imgs[idx] = try window.createImage(
+        try tiles.setPixels(
             .{
-                .height = text.height,
-                .width = text.width,
+                .size = .{
+                    .height = text.height,
+                    .width = text.width,
+                },
+                .origin = .{
+                    .x = 100,
+                    .y = 100 + (@as(u8, @truncate(i)) * 20),
+                },
             },
-            pixels,
+            @alignCast(std.mem.bytesAsSlice(canvas.types.RGBA, pixels)),
         );
     }
 
@@ -72,12 +82,21 @@ pub fn main() !void {
                 try window.clear(.{});
 
                 // draw each welcome message
-                for (welcome_imgs, 0..) |img, i| {
+                var tile_iter = tiles.areaIterator(canvas.bbox.BBox.empty);
+                while (tile_iter.next()) |tile| {
+                    const img = try window.createImage(
+                        .{
+                            .height = tile.area.size.height,
+                            .width = tile.area.size.width,
+                        },
+                        &std.mem.toBytes(tile.pixels),
+                    );
+                    defer img.deinit() catch {};
                     const target = anywin.BBox{
-                        .x = 100,
-                        .y = 100 + (@as(u8, @truncate(i)) * 20),
-                        .height = img.size.height,
-                        .width = img.size.width,
+                        .x = tile.area.origin.x,
+                        .y = tile.area.origin.y,
+                        .height = tile.area.size.height,
+                        .width = tile.area.size.width,
                     };
                     try img.draw(target);
                 }
@@ -156,6 +175,7 @@ const make_it_render = @import("make_it_render");
 
 const anywin = make_it_render.anywindow;
 const textz = make_it_render.textz;
+const canvas = make_it_render.canvas;
 
 const log = std.log.scoped(.demo);
 

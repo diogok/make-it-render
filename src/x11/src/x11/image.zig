@@ -90,3 +90,32 @@ pub fn rgbaToZPixmapAlloc(allocator: std.mem.Allocator, info: ImageInfo, rgba: [
 
     return pixels;
 }
+
+/// Convert an RGBa byte array to a ZPixmap byte array.
+/// RGBa format is expected to be in quads of u8.
+/// Alpha is ignored.
+pub fn rgbaToZPixmapInPlace(info: ImageInfo, pixels: []u8) !void {
+    // Only support a very specific visual type and format for now
+    if (info.visual_type.class != .TrueColor) {
+        return error.UnsupportedVisualTypeClass;
+    }
+    if (info.format.bits_per_pixel != 32) {
+        return error.UnsupportedBitsPerPixel;
+    }
+    if (info.format.bits_per_pixel != info.format.scanline_pad) {
+        return error.UnsupportedScanlinePad;
+    }
+
+    var idx: usize = 0;
+    while (idx < pixels.len) : (idx += 4) {
+        const b = pixels[idx + 2];
+        const g = pixels[idx + 1];
+        const r = pixels[idx];
+        pixels[idx] = b;
+        pixels[idx + 1] = g;
+        pixels[idx + 2] = r;
+        pixels[idx + 3] = 0;
+    }
+
+    return pixels;
+}

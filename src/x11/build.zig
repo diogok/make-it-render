@@ -22,6 +22,7 @@ pub fn build(b: *std.Build) void {
                 .target = target,
                 .optimize = optimize,
                 .strip = optimize == .ReleaseSmall,
+                .single_threaded = true,
             },
         );
         demo_mod.addImport("x11", x11);
