@@ -153,6 +153,7 @@ pub fn main() !void {
     // Here we will convert to a format called ZPixmap
     const yellow_block_zpixmap = try x11.rgbaToZPixmapAlloc(allocator, imageInfo, &pixels);
     defer allocator.free(yellow_block_zpixmap);
+   // try x11.rgbaToZPixmapInPlace(imageInfo, pixels);
 
     // Now that we how our pixels on the expected format
     // We put the pixels on the pixmap, using the graphic context

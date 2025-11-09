@@ -57,23 +57,23 @@ pub fn writeWithBytes(writer: *std.Io.Writer, request: anytype, bytes: []const u
     try writer.flush();
 }
 
-pub fn sendFromReader(conn: std.net.Stream, request: anytype, reader: *std.Io.Reader, len: usize) !void {
+pub fn sendFromReader(conn: std.net.Stream, request: anytype, reader: *std.Io.Reader, extra_len: usize) !void {
     var write_buffer: [64]u8 = undefined;
     var conn_writer = conn.writer(&write_buffer);
     const writer = &conn_writer.interface;
-    return stream(writer, request, reader, len);
+    return stream(writer, request, reader, extra_len);
 }
 
-pub fn stream(writer: *std.Io.Writer, request: anytype, reader: *std.Io.Reader, len: usize) !void {
+pub fn stream(writer: *std.Io.Writer, request: anytype, reader: *std.Io.Reader, extra_len: usize) !void {
     // send request with overriden length
-    const req_bytes = request_bytes_fixed_len(request, len);
+    const req_bytes = request_bytes_fixed_len(request, extra_len);
     try writer.writeAll(&req_bytes);
 
     // write extra bytes
     _ = try reader.stream(writer, .unlimited);
 
     // calculate padding and send it
-    const pad_len = get_pad_len(len);
+    const pad_len = get_pad_len(extra_len);
     const padding: [3]u8 = .{ 0, 0, 0 };
     const pad = padding[0..pad_len];
     try writer.writeAll(pad);
@@ -111,11 +111,11 @@ fn get_padded_len(request: anytype, src_bytes_len: usize) u16 {
 
 test "Length calc" {
     const change_prop = proto.ChangeProperty{ .window_id = 0, .property = 0, .property_type = 0 };
-    const len0 = get_padded_len(change_prop, "");
+    const len0 = get_padded_len(change_prop, "".len);
 
     try testing.expectEqual(6, len0);
 
-    const len1 = get_padded_len(change_prop, "hello");
+    const len1 = get_padded_len(change_prop, "hello".len);
     try testing.expectEqual(8, len1);
 }
 

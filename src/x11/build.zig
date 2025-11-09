@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
     const x11 = b.addModule(
         "x11",
         .{
-            .root_source_file = b.path("src/x11.zig"),
+            .root_source_file = b.path("src/root.zig"),
             .target = target,
             .optimize = optimize,
             .strip = optimize == .ReleaseSmall,
@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) void {
 
     {
         const tests_mod = b.addModule("tests", .{
-            .root_source_file = b.path("src/x11.zig"),
+            .root_source_file = b.path("src/root.zig"),
             .target = target,
             .optimize = optimize,
         });
@@ -59,7 +59,7 @@ pub fn build(b: *std.Build) void {
         const docs_mod = b.addModule("docs", .{
             .target = target,
             .optimize = .Debug,
-            .root_source_file = b.path("src/docs.zig"),
+            .root_source_file = b.path("src/root.zig"),
         });
 
         const docs = b.addObject(.{

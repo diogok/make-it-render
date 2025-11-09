@@ -68,26 +68,8 @@ pub fn getImageInfo(info: xsetup.Setup, root: u32) ImageInfo {
 /// RGBa format is expected to be in quads of u8.
 /// Alpha is ignored.
 pub fn rgbaToZPixmapAlloc(allocator: std.mem.Allocator, info: ImageInfo, rgba: []const u8) ![]const u8 {
-    // Only support a very specific visual type and format for now
-    if (info.visual_type.class != .TrueColor) {
-        return error.UnsupportedVisualTypeClass;
-    }
-    if (info.format.bits_per_pixel != 32) {
-        return error.UnsupportedBitsPerPixel;
-    }
-    if (info.format.bits_per_pixel != info.format.scanline_pad) {
-        return error.UnsupportedScanlinePad;
-    }
-
-    const pixels = try allocator.alloc(u8, rgba.len);
-    var idx: usize = 0;
-    while (idx < rgba.len) : (idx += 4) {
-        pixels[idx] = rgba[idx + 2];
-        pixels[idx + 1] = rgba[idx + 1];
-        pixels[idx + 2] = rgba[idx];
-        pixels[idx + 3] = 0;
-    }
-
+    const pixels=try allocator.dupe(u8,rgba);
+    try rgbaToZPixmapInPlace(info, pixels);
     return pixels;
 }
 
@@ -116,6 +98,4 @@ pub fn rgbaToZPixmapInPlace(info: ImageInfo, pixels: []u8) !void {
         pixels[idx + 2] = r;
         pixels[idx + 3] = 0;
     }
-
-    return pixels;
 }
