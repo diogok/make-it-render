@@ -151,9 +151,13 @@ pub fn main() !void {
     const imageInfo = x11.getImageInfo(info, create_window.parent_id);
 
     // Here we will convert to a format called ZPixmap
-    const yellow_block_zpixmap = try x11.rgbaToZPixmapAlloc(allocator, imageInfo, &pixels);
-    defer allocator.free(yellow_block_zpixmap);
-   // try x11.rgbaToZPixmapInPlace(imageInfo, pixels);
+    //const yellow_block_zpixmap = try x11.rgbaToZPixmapAlloc(allocator, imageInfo, &pixels);
+    //defer allocator.free(yellow_block_zpixmap);
+    // try x11.rgbaToZPixmapInPlace(imageInfo, pixels);
+
+    // let's try the Reader/Writer version
+    var pixels_reader = std.Io.Reader.fixed(&pixels);
+    var pixmap_reader = x11.RgbaToZPixmapReader.init(imageInfo, &pixels_reader);
 
     // Now that we how our pixels on the expected format
     // We put the pixels on the pixmap, using the graphic context
@@ -169,7 +173,13 @@ pub fn main() !void {
         .y = 0,
         .depth = pixmap_req.depth,
     };
-    try x11.sendWithBytes(conn, put_image_req, yellow_block_zpixmap);
+    //try x11.sendWithBytes(conn, put_image_req, yellow_block_zpixmap);
+
+    var net_writer_buffer: [64]u8 = undefined;
+    var net_writer = conn.writer(&net_writer_buffer);
+    var writer = &net_writer.interface;
+    try x11.stream(writer, put_image_req, (&pixmap_reader).interface(), pixels.len);
+    try writer.flush();
 
     // === Main loop === //
 

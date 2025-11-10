@@ -1,86 +1,57 @@
 //! Functions to send Requests and receive Responses, Messages and Replies from an X11 socket.
 //! This will be part of your core loop.
 
-const std = @import("std");
-const proto = @import("proto.zig");
-
-const testing = std.testing;
-
-const log = std.log.scoped(.x11);
-
-pub fn send(conn: std.net.Stream, request: anytype) !void {
-    //var write_buffer: [64]u8 = undefined;
-    //var conn_writer = conn.writer(&write_buffer);
-    //const writer = &conn_writer.interface;
-    //return write(writer, request);
-    const req_bytes: []const u8 = &std.mem.toBytes(request);
-    _ = std.posix.send(conn.handle, req_bytes, 0) catch unreachable;
-}
-
 /// Send a request to a socket.
 /// Use with any Request struct from proto namespace that does not need extra data.
+pub fn send(conn: std.net.Stream, request: anytype) !void {
+    const req_bytes: []const u8 = &std.mem.toBytes(request);
+    log.debug("Sending (size: {d}): {any}", .{ req_bytes.len, request });
+    _ = try std.posix.send(conn.handle, req_bytes, 0);
+}
+
+/// Send a request to a socket with some extra bytes at the end.
+/// It re-calculate the apropriate length and add needed padding.
+/// Use with Request structs from proto namespace that require additional data to be sent.
+pub fn sendWithBytes(conn: std.net.Stream, request: anytype, extra_bytes: []const u8) !void {
+    const req_bytes = request_bytes_fixed_len(request, extra_bytes.len);
+    log.debug("Sending (size: {d}): {any}", .{ req_bytes.len, request });
+
+    const pad_len = get_pad_len(extra_bytes.len);
+    const padding: [3]u8 = .{ 0, 0, 0 };
+    const pad = padding[0..pad_len];
+
+    _ = try std.posix.send(conn.handle, &req_bytes, 0);
+    _ = try std.posix.send(conn.handle, extra_bytes, 0);
+    _ = try std.posix.send(conn.handle, pad, 0);
+}
+
+/// Write a request to a writer with some extra bytes at the end.
+/// It re-calculate the apropriate length and add needed padding.
+/// Use with Request structs from proto namespace that require additional data to be sent.
 pub fn write(writer: *std.Io.Writer, request: anytype) !void {
     const req_bytes: []const u8 = &std.mem.toBytes(request);
     log.debug("Sending (size: {d}): {any}", .{ req_bytes.len, request });
     try writer.writeAll(req_bytes);
-    try writer.flush();
 }
 
-pub fn sendWithBytes(conn: std.net.Stream, request: anytype, bytes: []const u8) !void {
-    var write_buffer: [64]u8 = undefined;
-    var conn_writer = conn.writer(&write_buffer);
-    const writer = &conn_writer.interface;
-    //return writeWithBytes(writer, request, bytes);
-
-    var reader = std.Io.Reader.fixed(bytes);
-
-    return stream(writer, request, &reader, bytes.len);
-}
-
-/// Send a request to a socket with some extra bytes at the end.
-/// It re-calculate the propriate length and add neded padding.
+/// Write a request to a writer with some extra bytes at the end from a reader.
+/// It re-calculate the apropriate length and add needed padding.
 /// Use with Request structs from proto namespace that require additional data to be sent.
-pub fn writeWithBytes(writer: *std.Io.Writer, request: anytype, bytes: []const u8) !void {
-    // send request with overriden length
-    const req_bytes = request_bytes_fixed_len(request, bytes.len);
-    try writer.writeAll(&req_bytes);
-
-    // write extra bytes
-    try writer.writeAll(bytes);
-
-    // calculate padding and send it
-    const pad_len = get_pad_len(bytes.len);
-    const padding: [3]u8 = .{ 0, 0, 0 };
-    const pad = padding[0..pad_len];
-    try writer.writeAll(pad);
-
-    try writer.flush();
-}
-
-pub fn sendFromReader(conn: std.net.Stream, request: anytype, reader: *std.Io.Reader, extra_len: usize) !void {
-    var write_buffer: [64]u8 = undefined;
-    var conn_writer = conn.writer(&write_buffer);
-    const writer = &conn_writer.interface;
-    return stream(writer, request, reader, extra_len);
-}
-
 pub fn stream(writer: *std.Io.Writer, request: anytype, reader: *std.Io.Reader, extra_len: usize) !void {
-    // send request with overriden length
+    log.warn("Stream!!", .{});
     const req_bytes = request_bytes_fixed_len(request, extra_len);
-    try writer.writeAll(&req_bytes);
-
-    // write extra bytes
-    _ = try reader.stream(writer, .unlimited);
 
     // calculate padding and send it
     const pad_len = get_pad_len(extra_len);
     const padding: [3]u8 = .{ 0, 0, 0 };
     const pad = padding[0..pad_len];
-    try writer.writeAll(pad);
 
-    try writer.flush();
+    try writer.writeAll(&req_bytes);
+    _ = try reader.stream(writer, std.Io.Limit.limited(extra_len));
+    try writer.writeAll(pad);
 }
 
+/// Return the request as a byte slice, with length property fixed to consider extra bytes and padding.
 fn request_bytes_fixed_len(request: anytype, bytes_len: usize) [@sizeOf(@TypeOf(request))]u8 {
     var req_bytes = std.mem.toBytes(request);
 
@@ -142,6 +113,7 @@ test "padding length" {
     try testing.expectEqual(0, len3);
 }
 
+/// Receive a message from a socket.
 pub fn receive(conn: std.net.Stream) !?Message {
     var read_buffer: [64]u8 = undefined;
     var conn_reader = conn.reader(&read_buffer);
@@ -227,3 +199,10 @@ pub const Message = union(enum(u8)) {
     ClientMessage: proto.ClientMessage,
     MappingNotify: proto.MappingNotify,
 };
+
+const std = @import("std");
+const proto = @import("proto.zig");
+
+const testing = std.testing;
+
+const log = std.log.scoped(.x11);

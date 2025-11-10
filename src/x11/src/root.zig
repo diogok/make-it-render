@@ -21,7 +21,6 @@ pub const image = @import("x11/image.zig");
 /// Random utilities.
 pub const utils = @import("x11/utils.zig");
 
-
 pub const ConnectionOptions = connection.ConnectionOptions;
 pub const connect = connection.connect;
 
@@ -33,7 +32,10 @@ pub const Depth = setup0.Depth;
 pub const XID = xid.XID;
 
 pub const send = io.send;
+pub const write = io.write;
+pub const stream = io.stream;
 pub const sendWithBytes = io.sendWithBytes;
+pub const sendFromReader = io.sendFromReader;
 pub const receive = io.receive;
 pub const Message = io.Message;
 
@@ -41,6 +43,7 @@ pub const ImageInfo = image.ImageInfo;
 pub const getImageInfo = image.getImageInfo;
 pub const rgbaToZPixmapInPlace = image.rgbaToZPixmapInPlace;
 pub const rgbaToZPixmapAlloc = image.rgbaToZPixmapAlloc;
+pub const RgbaToZPixmapReader = image.RgbaToZPixmapReader;
 
 pub const mask = utils.mask;
 pub const maskFromValues = utils.maskFromValues;

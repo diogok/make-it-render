@@ -1,11 +1,5 @@
 //! Functions to help handle image format for X11.
 
-const std = @import("std");
-const xsetup = @import("setup.zig");
-const proto = @import("proto.zig");
-
-const log = std.log.scoped(.x11);
-
 /// Minimal information to be able to convert to/from an X11 image format.
 pub const ImageInfo = struct {
     /// Visual type holds information about how to mask RGB values.
@@ -67,8 +61,9 @@ pub fn getImageInfo(info: xsetup.Setup, root: u32) ImageInfo {
 /// Convert an RGBa byte array to a ZPixmap byte array.
 /// RGBa format is expected to be in quads of u8.
 /// Alpha is ignored.
+/// Return a new slice owned by caller.
 pub fn rgbaToZPixmapAlloc(allocator: std.mem.Allocator, info: ImageInfo, rgba: []const u8) ![]const u8 {
-    const pixels=try allocator.dupe(u8,rgba);
+    const pixels = try allocator.dupe(u8, rgba);
     try rgbaToZPixmapInPlace(info, pixels);
     return pixels;
 }
@@ -76,6 +71,7 @@ pub fn rgbaToZPixmapAlloc(allocator: std.mem.Allocator, info: ImageInfo, rgba: [
 /// Convert an RGBa byte array to a ZPixmap byte array.
 /// RGBa format is expected to be in quads of u8.
 /// Alpha is ignored.
+/// Replaces values in the provided slice.
 pub fn rgbaToZPixmapInPlace(info: ImageInfo, pixels: []u8) !void {
     // Only support a very specific visual type and format for now
     if (info.visual_type.class != .TrueColor) {
@@ -88,6 +84,10 @@ pub fn rgbaToZPixmapInPlace(info: ImageInfo, pixels: []u8) !void {
         return error.UnsupportedScanlinePad;
     }
 
+    rgbaToZPixmap(pixels);
+}
+
+fn rgbaToZPixmap(pixels: []u8) void {
     var idx: usize = 0;
     while (idx < pixels.len) : (idx += 4) {
         const b = pixels[idx + 2];
@@ -99,3 +99,59 @@ pub fn rgbaToZPixmapInPlace(info: ImageInfo, pixels: []u8) !void {
         pixels[idx + 3] = 0;
     }
 }
+
+pub const RgbaToZPixmapReader = struct {
+    reader: *std.Io.Reader,
+
+    interface_state: std.Io.Reader,
+    pub fn init(_: ImageInfo, reader: *std.Io.Reader) @This() {
+        return @This(){
+            //.buffer = undefined,
+            .reader = reader,
+
+            .interface_state = .{
+                .vtable = &.{
+                    .stream = @This().rgbaToZPixmapStream,
+                },
+                .buffer = &[0]u8{},
+                .end = 0,
+                .seek = 0,
+            },
+        };
+    }
+
+    pub fn interface(self: *@This()) *std.Io.Reader {
+        return &self.interface_state;
+    }
+
+    fn rgbaToZPixmapStream(
+        reader: *std.Io.Reader,
+        writer: *std.Io.Writer,
+        _: std.Io.Limit,
+    ) std.Io.Reader.StreamError!usize {
+        const self: *@This() = @alignCast(@fieldParentPtr("interface_state", reader));
+
+        var count: usize = 0;
+        while (true) {
+            const buffer = self.reader.take(4) catch |err| {
+                switch (err) {
+                    error.EndOfStream => break,
+                    error.ReadFailed => return err,
+                }
+            };
+            rgbaToZPixmap(buffer);
+            if (buffer.len != 0) {
+                count += try writer.write(buffer);
+            } else {
+                break;
+            }
+        }
+        return count;
+    }
+};
+
+const std = @import("std");
+const xsetup = @import("setup.zig");
+const proto = @import("proto.zig");
+
+const log = std.log.scoped(.x11);
