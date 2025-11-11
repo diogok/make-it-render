@@ -38,7 +38,7 @@ pub const Position = struct {
     y: Y = 0,
 };
 
-pub const Pixels = []const u8;
+pub const Pixels = []u8;
 
 pub const Event = union(enum) {
     nop: void,

@@ -23,10 +23,13 @@ pub fn main() !void {
         y, y, y, y, y,
         y, y, y, y, y,
     };
-    const pixels = std.mem.toBytes(yellow_block);
+    var pixels = std.mem.toBytes(yellow_block);
 
-    const image = try window.createImage(.{ .height = 5, .width = 5 }, &pixels);
+    var image = try window.createImage(.{ .height = 5, .width = 5 }, &pixels);
     defer image.deinit() catch unreachable;
+    try wm.flush();
+
+    var timer = try std.time.Timer.start();
 
     while (window.status == .open) {
         const event = try wm.receive();
@@ -35,6 +38,8 @@ pub fn main() !void {
                 try window.destroy();
             },
             .draw => {
+                timer.reset();
+
                 const target = win.BBox{
                     .x = 100,
                     .y = 100,
@@ -42,9 +47,13 @@ pub fn main() !void {
                     .width = image.size.width,
                 };
                 try image.draw(target);
+                try wm.flush();
+
+                log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.us_per_ms});
             },
             .mouse_pressed, .mouse_released, .key_pressed, .key_released => {
                 log.debug("{any}", .{event});
+                try window.redraw(.{});
             },
             else => {},
         }

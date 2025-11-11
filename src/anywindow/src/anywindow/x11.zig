@@ -19,6 +19,9 @@ pub const WindowManager = struct {
     info: x11.Setup,
     xid: x11.XID,
 
+    net_writer_buffer: []u8,
+    net_writer: *std.net.Stream.Writer,
+
     pub fn init(allocator: std.mem.Allocator) !@This() {
         const conn = try x11.connect(.{});
         const info = try x11.setup(allocator, conn);
@@ -32,18 +35,27 @@ pub const WindowManager = struct {
             .wm_delete_window = try x11.internAtom(conn, "WM_DELETE_WINDOW"),
         };
 
+        const net_writer_buffer: []u8 = try allocator.alloc(u8, 1024 * 1024 * 1024);
+        const net_writer = try allocator.create(std.net.Stream.Writer);
+        net_writer.* = conn.writer(net_writer_buffer);
+
         return @This(){
             .allocator = allocator,
             .conn = conn,
             .info = info,
             .xid = xid,
             .atoms = atoms,
+
+            .net_writer_buffer = net_writer_buffer,
+            .net_writer = net_writer,
         };
     }
 
     pub fn deinit(self: *@This()) void {
         self.conn.close();
         self.info.deinit();
+        self.allocator.free(self.net_writer_buffer);
+        self.allocator.destroy(self.net_writer);
     }
 
     pub fn createWindow(self: *@This(), options: common.WindowOptions) !Window {
@@ -125,6 +137,10 @@ pub const WindowManager = struct {
         } else {
             return .{ .nop = {} };
         }
+    }
+
+    pub fn flush(self: *@This()) !void {
+        try self.net_writer.interface.flush();
     }
 };
 
@@ -244,7 +260,8 @@ pub const Window = struct {
             .height = area.height,
             .width = area.width,
         };
-        try x11.send(self.wm.conn, clear_area);
+
+        try x11.write(&self.wm.net_writer.interface, clear_area);
     }
 
     pub fn redraw(self: *@This(), area: common.BBox) !void {
@@ -264,6 +281,7 @@ pub const Image = struct {
     window: *Window,
     image_id: u32,
     size: common.Size,
+    pixels: common.Pixels,
 
     pub fn init(window: *Window, size: common.Size, pixels: common.Pixels) !@This() {
         const pixmap_id = try window.wm.xid.genID();
@@ -275,12 +293,14 @@ pub const Image = struct {
             .height = size.height,
             .depth = window.depth,
         };
-        try x11.send(window.wm.conn, pixmap_req);
+
+        try x11.write(&window.wm.net_writer.interface, pixmap_req);
 
         const self = @This(){
             .image_id = pixmap_id,
             .window = window,
             .size = size,
+            .pixels = pixels,
         };
 
         if (pixels.len > 0) {
@@ -293,8 +313,8 @@ pub const Image = struct {
     fn setPixels(self: @This(), pixels: common.Pixels) !void {
         const image_info = x11.getImageInfo(self.window.wm.info, self.window.root);
 
-        const zpixmap = try x11.rgbaToZPixmapAlloc(self.window.wm.allocator, image_info, pixels);
-        defer self.window.wm.allocator.free(zpixmap);
+        var fixed_reader = std.Io.Reader.fixed(pixels);
+        var reader = x11.RgbaToZPixmapReader.init(image_info, &fixed_reader);
 
         const put_image_req = x11.proto.PutImage{
             .drawable_id = self.image_id,
@@ -306,7 +326,7 @@ pub const Image = struct {
             .depth = self.window.depth,
         };
 
-        try x11.sendWithBytes(self.window.wm.conn, put_image_req, zpixmap);
+        try x11.stream(&self.window.wm.net_writer.interface, put_image_req, (&reader).interface(), pixels.len);
     }
 
     pub fn draw(self: @This(), target: common.BBox) !void {
@@ -319,13 +339,13 @@ pub const Image = struct {
             .dst_x = target.x,
             .dst_y = target.y,
         };
-        try x11.send(self.window.wm.conn, copy_area_req);
+        try x11.write(&self.window.wm.net_writer.interface, copy_area_req);
     }
 
     pub fn deinit(self: @This()) !void {
         const free_image_req = x11.proto.FreePixmap{
             .pixmap_id = self.image_id,
         };
-        try x11.send(self.window.wm.conn, free_image_req);
+        try x11.write(&self.window.wm.net_writer.interface, free_image_req);
     }
 };
