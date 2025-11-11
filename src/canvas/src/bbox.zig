@@ -1,74 +1,72 @@
 pub const BBox = struct {
-    origin: types.Point,
-    size: types.Size,
+    height: common.Height = 0,
+    width: common.Width = 0,
+    x: common.X = 0,
+    y: common.Y = 0,
 
-    pub const empty = BBox{
-        .origin = .{ .x = 0, .y = 0 },
-        .size = .{ .width = 0, .height = 0 },
-    };
-
-    pub fn containsPoint(self: @This(), point: types.Point) bool {
-        return point.x >= self.origin.x and
+    /// Checks is a point in global coordinates is in this BBox.
+    pub fn containsPoint(self: @This(), point: common.Point) bool {
+        return point.x >= self.x and
             point.x < self.maxX() and
-            point.y >= self.origin.y and
+            point.y >= self.y and
             point.y < self.maxY();
     }
 
-    pub fn maxY(self: @This()) types.Y {
-        return self.origin.y + @as(i16, @intCast(self.size.height));
+    /// Return max Y coordinate that fits this BBox.
+    /// This is the limit in global Y axis.
+    pub fn maxY(self: @This()) common.Y {
+        return self.y + @as(i16, @intCast(self.height));
     }
 
-    pub fn maxX(self: @This()) types.X {
-        return self.origin.x + @as(i16, @intCast(self.size.width));
+    /// Return max Y coordinate that fits this BBox.
+    /// This is the limit in global X axis.
+    pub fn maxX(self: @This()) common.X {
+        return self.x + @as(i16, @intCast(self.width));
     }
 
-    pub fn internalPoint(self: @This(), point: types.Point) types.Point {
+    /// Converts a global/absolute point to a relative point.
+    /// This returns the internal coordinates for an absolute point.
+    pub fn internalPoint(self: @This(), point: common.Point) common.Point {
         return .{
-            .x = point.x - self.origin.x,
-            .y = point.y - self.origin.y,
+            .x = point.x - self.x,
+            .y = point.y - self.y,
         };
     }
 
+    /// Checks if this overlaps with another bbox.
     pub fn overlaps(self: @This(), other: @This()) bool {
-        return self.origin.x < other.maxX() and
-            other.origin.x < self.maxX() and
-            self.origin.y < other.maxY() and
-            other.origin.y < self.maxY();
+        return self.x < other.maxX() and
+            other.x < self.maxX() and
+            self.y < other.maxY() and
+            other.y < self.maxY();
     }
 
-    pub fn isEmpty(self: @This()) bool {
-        return self.origin.x == 0 and self.origin.y == 0 and self.size.height == 0 and self.size.width == 0;
+    /// Total number of pixels that fit.
+    pub fn size(self: @This()) usize {
+        return @as(usize, @intCast(self.width)) * @as(usize, @intCast(self.height));
     }
 };
 
 test "box overlaps" {
     const bbox0 = BBox{
-        .origin = .{
-            .x = 2,
-            .y = 2,
-        },
-        .size = .{
-            .height = 25,
-            .width = 25,
-        },
+        .x = 2,
+        .y = 2,
+        .height = 25,
+        .width = 25,
     };
 
-    try testing.expect(bbox0.overlaps(.{ .origin = .{ .x = 0, .y = 0 }, .size = .{ .height = 50, .width = 50 } }));
-    try testing.expect(bbox0.overlaps(.{ .origin = .{ .x = 0, .y = 0 }, .size = .{ .height = 5, .width = 50 } }));
-    try testing.expect(bbox0.overlaps(.{ .origin = .{ .x = 20, .y = 20 }, .size = .{ .height = 5, .width = 50 } }));
-    try testing.expect(!bbox0.overlaps(.{ .origin = .{ .x = 28, .y = 28 }, .size = .{ .height = 5, .width = 5 } }));
+    try testing.expect(bbox0.overlaps(.{ .x = 0, .y = 0, .height = 50, .width = 50 }));
+    try testing.expect(bbox0.overlaps(.{ .x = 0, .y = 0, .height = 5, .width = 50 }));
+    try testing.expect(bbox0.overlaps(.{ .x = 20, .y = 20, .height = 5, .width = 50 }));
+    try testing.expect(!bbox0.overlaps(.{ .x = 28, .y = 28, .height = 5, .width = 5 }));
 }
 
 test "bbx internal point" {
     const bbox0 = BBox{
-        .origin = .{
-            .x = 0,
-            .y = 0,
-        },
-        .size = .{
-            .height = 25,
-            .width = 25,
-        },
+        .x = 0,
+        .y = 0,
+        .height = 25,
+        .width = 25,
     };
 
     const point0A = bbox0.internalPoint(.{ .x = 0, .y = 0 });
@@ -80,14 +78,10 @@ test "bbx internal point" {
     try testing.expectEqual(12, point0B.y);
 
     const bbox1 = BBox{
-        .origin = .{
-            .x = 25,
-            .y = 25,
-        },
-        .size = .{
-            .height = 25,
-            .width = 25,
-        },
+        .x = 25,
+        .y = 25,
+        .height = 25,
+        .width = 25,
     };
 
     const point1A = bbox1.internalPoint(.{ .x = 25, .y = 25 });
@@ -105,14 +99,10 @@ test "bbx internal point" {
 
 test "bbox contains point" {
     const bbox0 = BBox{
-        .origin = .{
-            .x = 0,
-            .y = 0,
-        },
-        .size = .{
-            .height = 25,
-            .width = 25,
-        },
+        .x = 0,
+        .y = 0,
+        .height = 25,
+        .width = 25,
     };
 
     try testing.expect(bbox0.containsPoint(.{ .x = 0, .y = 0 }));
@@ -126,14 +116,10 @@ test "bbox contains point" {
     try testing.expect(!bbox0.containsPoint(.{ .x = 25, .y = 25 }));
 
     const bbox1 = BBox{
-        .origin = .{
-            .x = 25,
-            .y = 25,
-        },
-        .size = .{
-            .height = 25,
-            .width = 25,
-        },
+        .x = 25,
+        .y = 25,
+        .height = 25,
+        .width = 25,
     };
 
     try testing.expect(!bbox1.containsPoint(.{ .x = 0, .y = 0 }));
@@ -155,4 +141,4 @@ test "bbox contains point" {
 const std = @import("std");
 const testing = std.testing;
 
-const types = @import("types.zig");
+const common = @import("common.zig");

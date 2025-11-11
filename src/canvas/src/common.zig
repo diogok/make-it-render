@@ -1,17 +1,6 @@
 const std = @import("std");
 const testing = std.testing;
 
-pub const Intensity = u8;
-
-pub const RGBA = packed struct {
-    red: Intensity = 0,
-    green: Intensity = 0,
-    blue: Intensity = 0,
-    alpha: Intensity = 0,
-};
-
-pub const Pixels = []const RGBA;
-
 // size on the Y coordinates
 pub const Height = u16;
 // size on the X coordinates
@@ -27,6 +16,6 @@ pub const Point = packed struct {
 };
 
 pub const Size = packed struct {
-    height: Height,
     width: Width,
+    height: Height,
 };

@@ -1,18 +1,19 @@
 pub const Tile = struct {
-    area: BBox,
-    // pixels of the tile
-    pixels: []types.RGBA,
+    /// bbox of the tile
+    bbox: BBox,
+    /// pixels of the tile
+    pixels: []u8,
 
     pub fn init(
         allocator: std.mem.Allocator,
-        area: BBox,
+        bbox: BBox,
     ) !@This() {
-        const pixels = try allocator.alloc(types.RGBA, @as(usize, @intCast(area.size.width)) * @as(usize, @intCast(area.size.height)));
+        const pixels = try allocator.alloc(u8, bbox.size() * 4);
         for (pixels, 0..) |_, i| {
-            pixels[i] = std.mem.zeroes(types.RGBA);
+            pixels[i] = 0;
         }
         return @This(){
-            .area = area,
+            .bbox = bbox,
             .pixels = pixels,
         };
     }
@@ -23,111 +24,97 @@ pub const Tile = struct {
 
     /// if the points is contained in this tile, set the color for the pixel
     /// returns true if pixel was set, thus contained. returns false otherwise
-    pub fn maybeSetPixel(self: @This(), point: types.Point, color: types.RGBA) bool {
-        if (self.containsPoint(point)) {
-            self.setPixel(point, color);
+    pub fn maybeSetPixel(self: @This(), point: common.Point, pixel: []const u8) bool {
+        std.debug.assert(pixel.len % 4 == 0);
+        if (self.bbox.containsPoint(point)) {
+            self.setPixel(point, pixel);
             return true;
         }
         return false;
     }
 
-    fn containsPoint(self: @This(), point: types.Point) bool {
-        return self.area.containsPoint(point);
-    }
-
-    fn overlaps(self: @This(), area: BBox) bool {
-        return self.area.overlaps(area);
-    }
-
-    fn setPixel(self: @This(), point: types.Point, color: types.RGBA) void {
-        const fixed_point = self.area.internalPoint(point);
-        const index = indexFromPoint(self.area.size.width, fixed_point);
-        self.pixels[index] = color;
+    fn setPixel(self: @This(), point: common.Point, pixel: []const u8) void {
+        std.debug.assert(pixel.len % 4 == 0);
+        const fixed_point = self.bbox.internalPoint(point);
+        const index = indexFromPoint(self.bbox.width, fixed_point);
+        std.mem.copyForwards(u8, self.pixels[index .. index + 4], pixel);
     }
 };
 
-fn indexFromPoint(width: types.Width, point: types.Point) usize {
-    return @abs(point.y) * width + @abs(point.x);
+fn indexFromPoint(width: common.Width, point: common.Point) usize {
+    return @abs(point.y) * width * 4 + @abs(point.x) * 4;
 }
 
 test "find index from point" {
     try testing.expectEqual(0, indexFromPoint(25, .{ .x = 0, .y = 0 }));
-    try testing.expectEqual(1, indexFromPoint(25, .{ .x = 1, .y = 0 }));
-    try testing.expectEqual(25, indexFromPoint(25, .{ .x = 0, .y = 1 }));
-    try testing.expectEqual(26, indexFromPoint(25, .{ .x = 1, .y = 1 }));
-    try testing.expectEqual(624, indexFromPoint(25, .{ .x = 24, .y = 24 }));
+    try testing.expectEqual(4, indexFromPoint(25, .{ .x = 1, .y = 0 }));
+    try testing.expectEqual(100, indexFromPoint(25, .{ .x = 0, .y = 1 }));
+    try testing.expectEqual(104, indexFromPoint(25, .{ .x = 1, .y = 1 }));
+    try testing.expectEqual(2496, indexFromPoint(25, .{ .x = 24, .y = 24 }));
 }
 
 test "Basic tiles" {
     const bbox = BBox{
-        .size = .{
-            .width = 5,
-            .height = 5,
-        },
-        .origin = .{
-            .x = 0,
-            .y = 0,
-        },
+        .width = 5,
+        .height = 5,
+        .x = 0,
+        .y = 0,
     };
     const tile0 = try Tile.init(testing.allocator, bbox);
     defer testing.allocator.free(tile0.pixels);
 
-    try testing.expect(tile0.maybeSetPixel(.{ .x = 1, .y = 1 }, .{ .red = 10 }));
-    try testing.expect(tile0.maybeSetPixel(.{ .x = 4, .y = 4 }, .{ .red = 20 }));
-    try testing.expect(!tile0.maybeSetPixel(.{ .x = 5, .y = 1 }, .{ .red = 20 }));
-    try testing.expect(!tile0.maybeSetPixel(.{ .x = 0, .y = 5 }, .{ .red = 20 }));
+    try testing.expect(tile0.maybeSetPixel(.{ .x = 1, .y = 1 }, &[_]u8{ 10, 0, 0, 1 }));
+    try testing.expect(tile0.maybeSetPixel(.{ .x = 4, .y = 4 }, &[_]u8{ 20, 0, 0, 1 }));
+    try testing.expect(!tile0.maybeSetPixel(.{ .x = 5, .y = 1 }, &[_]u8{ 20, 0, 0, 1 }));
+    try testing.expect(!tile0.maybeSetPixel(.{ .x = 0, .y = 5 }, &[_]u8{ 20, 0, 0, 1 }));
 
-    const expected = &[_]types.RGBA{
-        .{}, .{},            .{}, .{}, .{},
-        .{}, .{ .red = 10 }, .{}, .{}, .{},
-        .{}, .{},            .{}, .{}, .{},
-        .{}, .{},            .{}, .{}, .{},
-        .{}, .{},            .{}, .{}, .{ .red = 20 },
+    const expected = &[_]u8{
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0,
+        0, 0, 0, 0, 10, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0,
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0,
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0,
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0, 1,
     };
 
-    try testing.expectEqualSlices(types.RGBA, expected, tile0.pixels);
+    try testing.expectEqualSlices(u8, expected, tile0.pixels);
 }
 
 test "Basic tiles 2" {
     const bbox = BBox{
-        .size = .{
-            .width = 5,
-            .height = 5,
-        },
-        .origin = .{
-            .x = 5,
-            .y = 5,
-        },
+        .width = 5,
+        .height = 5,
+        .x = 5,
+        .y = 5,
     };
     const tile0 = try Tile.init(testing.allocator, bbox);
     defer testing.allocator.free(tile0.pixels);
 
-    try testing.expect(!tile0.maybeSetPixel(.{ .x = 1, .y = 1 }, .{ .red = 10 }));
-    try testing.expect(!tile0.maybeSetPixel(.{ .x = 4, .y = 4 }, .{ .red = 20 }));
-    try testing.expect(!tile0.maybeSetPixel(.{ .x = 5, .y = 1 }, .{ .red = 20 }));
-    try testing.expect(!tile0.maybeSetPixel(.{ .x = 0, .y = 5 }, .{ .red = 20 }));
-    try testing.expect(tile0.maybeSetPixel(.{ .x = 5, .y = 5 }, .{ .red = 30 }));
-    try testing.expect(tile0.maybeSetPixel(.{ .x = 6, .y = 6 }, .{ .red = 40 }));
+    try testing.expect(!tile0.maybeSetPixel(.{ .x = 1, .y = 1 }, &[_]u8{ 10, 0, 0, 1 }));
+    try testing.expect(!tile0.maybeSetPixel(.{ .x = 4, .y = 4 }, &[_]u8{ 20, 0, 0, 1 }));
+    try testing.expect(!tile0.maybeSetPixel(.{ .x = 5, .y = 1 }, &[_]u8{ 20, 0, 0, 1 }));
+    try testing.expect(!tile0.maybeSetPixel(.{ .x = 0, .y = 5 }, &[_]u8{ 20, 0, 0, 1 }));
+    try testing.expect(tile0.maybeSetPixel(.{ .x = 5, .y = 5 }, &[_]u8{ 30, 0, 0, 1 }));
+    try testing.expect(tile0.maybeSetPixel(.{ .x = 6, .y = 6 }, &[_]u8{ 40, 0, 0, 1 }));
 
-    const expected = &[_]types.RGBA{
-        .{ .red = 30 }, .{},            .{}, .{}, .{},
-        .{},            .{ .red = 40 }, .{}, .{}, .{},
-        .{},            .{},            .{}, .{}, .{},
-        .{},            .{},            .{}, .{}, .{},
-        .{},            .{},            .{}, .{}, .{},
+    const expected = &[_]u8{
+        30, 0, 0, 1, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0,  0, 0, 0, 40, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0,  0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0,  0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0,  0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     };
 
-    try testing.expectEqualSlices(types.RGBA, expected, tile0.pixels);
+    try testing.expectEqualSlices(u8, expected, tile0.pixels);
 }
 
 pub const TileList = std.ArrayList(Tile);
 
 pub const TileMap = struct {
     allocator: std.mem.Allocator,
-    tile_size: types.Size,
+    tile_size: common.Size,
     tiles: TileList,
 
-    pub fn init(allocator: std.mem.Allocator, tile_size: types.Size) @This() {
+    pub fn init(allocator: std.mem.Allocator, tile_size: common.Size) @This() {
         return @This(){
             .allocator = allocator,
             .tiles = TileList{},
@@ -142,51 +129,61 @@ pub const TileMap = struct {
         self.tiles.deinit(self.allocator);
     }
 
-    pub fn setPixels(self: *@This(), area: BBox, pixels: []const types.RGBA) !void {
+    pub fn setPixels(self: *@This(), bbox: BBox, pixels: []const u8) !void {
+        std.debug.assert(pixels.len % 4 == 0);
+        std.debug.assert(bbox.size() * 4 == pixels.len);
+
         var y: i16 = 0;
-        while (y < area.size.height) : (y += 1) {
+        while (y < bbox.height) : (y += 1) {
             var x: i16 = 0;
-            while (x < area.size.width) : (x += 1) {
-                const point = types.Point{ .x = x, .y = y };
-                const index = indexFromPoint(area.size.width, point);
-                const pixel = pixels[index];
-                if (pixel.green > 0 or pixel.red > 0 or pixel.blue > 0 or pixel.alpha > 0) {
+            while (x < bbox.width) : (x += 1) {
+                const point: common.Point = .{ .x = x, .y = y };
+                const index: usize = indexFromPoint(bbox.width, point);
+                const pixel: []const u8 = pixels[index .. index + 4];
+                if (!std.mem.eql(u8, &[_]u8{ 0, 0, 0, 0 }, pixel)) {
                     try self.setPixel(point, pixel);
                 }
             }
         }
     }
 
-    pub fn setPixel(self: *@This(), point: types.Point, color: types.RGBA) !void {
+    pub fn setPixel(self: *@This(), point: common.Point, pixel: []const u8) !void {
+        std.debug.assert(pixel.len == 4);
+
         for (self.tiles.items) |tile| {
-            if (tile.maybeSetPixel(point, color)) {
+            if (tile.maybeSetPixel(point, pixel)) {
                 return;
             }
         }
 
         const origin = self.tileOriginForPoint(point);
-        const bbox = BBox{ .size = self.tile_size, .origin = origin };
+        const bbox = BBox{
+            .x = origin.x,
+            .y = origin.y,
+            .height = self.tile_size.height,
+            .width = self.tile_size.width,
+        };
         const tile = try Tile.init(self.allocator, bbox);
-        tile.setPixel(point, color);
+        tile.setPixel(point, pixel);
 
         try self.tiles.append(self.allocator, tile);
     }
 
-    pub fn areaIterator(self: *@This(), area: BBox) TileAreaIterator {
-        return TileAreaIterator{
-            .bbox = area,
+    pub fn iterator(self: *@This(), bbox: ?BBox) TileMapIterator {
+        return TileMapIterator{
+            .bbox = bbox,
             .tiles = self.tiles.items,
         };
     }
 
-    fn tileOriginForPoint(self: *@This(), point: types.Point) types.Point {
+    fn tileOriginForPoint(self: *@This(), point: common.Point) common.Point {
         const a = @divFloor(point.x, @as(i16, @intCast(self.tile_size.height)));
         const x = (a * @as(i16, @intCast(self.tile_size.height)));
 
         const b = @divFloor(point.y, @as(i16, @intCast(self.tile_size.width)));
         const y = (b * @as(i16, @intCast(self.tile_size.width)));
 
-        return types.Point{
+        return common.Point{
             .x = x,
             .y = y,
         };
@@ -218,16 +215,23 @@ test "find origin" {
     try testing.expectEqual(5, p4.y);
 }
 
-pub const TileAreaIterator = struct {
+pub const TileMapIterator = struct {
     tiles: []const Tile,
-    bbox: BBox,
+    bbox: ?BBox,
 
     pos: usize = 0,
 
     pub fn next(self: *@This()) ?Tile {
-        while (self.pos < self.tiles.len) : (self.pos += 1) {
-            if (self.tiles[self.pos].overlaps(self.bbox) or self.bbox.isEmpty()) {
-                const tile = self.tiles[self.pos];
+        while (self.pos < self.tiles.len) {
+            const tile = self.tiles[self.pos];
+            if (self.bbox) |bbox| {
+                if (tile.bbox.overlaps(bbox)) {
+                    self.pos += 1;
+                    return tile;
+                } else {
+                    self.pos += 1;
+                }
+            } else {
                 self.pos += 1;
                 return tile;
             }
@@ -240,39 +244,37 @@ test "Basic tile map" {
     var tiles = TileMap.init(testing.allocator, .{ .width = 5, .height = 5 });
     defer tiles.deinit();
 
-    try tiles.setPixel(.{ .x = 1, .y = 1 }, .{ .red = 99 });
-    try tiles.setPixel(.{ .x = 18, .y = 18 }, .{ .red = 250 });
+    try tiles.setPixel(.{ .x = 1, .y = 1 }, &[_]u8{ 99, 0, 0, 1 });
+    try tiles.setPixel(.{ .x = 18, .y = 18 }, &[_]u8{ 250, 0, 0, 1 });
 
-    var iter = tiles.areaIterator(.{
-        .origin = .{ .x = 2, .y = 2 },
-        .size = .{
-            .height = 100,
-            .width = 100,
-        },
+    var iter = tiles.iterator(.{
+        .x = 2,
+        .y = 2,
+        .height = 100,
+        .width = 100,
     });
 
-    const expected0 = &[_]types.RGBA{
-        .{}, .{},            .{}, .{}, .{},
-        .{}, .{ .red = 99 }, .{}, .{}, .{},
-        .{}, .{},            .{}, .{}, .{},
-        .{}, .{},            .{}, .{}, .{},
-        .{}, .{},            .{}, .{}, .{},
+    const expected0 = &[_]u8{
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 99, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     };
-
     const tile0 = iter.next();
     try testing.expect(tile0 != null);
-    try testing.expectEqualSlices(types.RGBA, expected0, tile0.?.pixels);
+    try testing.expectEqualSlices(u8, expected0, tile0.?.pixels);
 
-    const expected1 = &[_]types.RGBA{
-        .{}, .{}, .{}, .{},             .{},
-        .{}, .{}, .{}, .{},             .{},
-        .{}, .{}, .{}, .{},             .{},
-        .{}, .{}, .{}, .{ .red = 250 }, .{},
-        .{}, .{}, .{}, .{},             .{},
+    const expected1 = &[_]u8{
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 250, 0, 0, 1, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0,
     };
     const tile1 = iter.next();
     try testing.expect(tile1 != null);
-    try testing.expectEqualSlices(types.RGBA, expected1, tile1.?.pixels);
+    try testing.expectEqualSlices(u8, expected1, tile1.?.pixels);
 
     const tile2 = iter.next();
     try testing.expect(tile2 == null);
@@ -282,43 +284,39 @@ test "Draw pixels tile map" {
     var tiles = TileMap.init(testing.allocator, .{ .width = 2, .height = 2 });
     defer tiles.deinit();
 
-    const pixels = &[_]types.RGBA{
-        .{}, .{},            .{}, .{},              .{},
-        .{}, .{ .red = 99 }, .{}, .{},              .{},
-        .{}, .{},            .{}, .{},              .{},
-        .{}, .{},            .{}, .{ .green = 10 }, .{},
-        .{}, .{},            .{}, .{},              .{},
+    const pixels = &[_]u8{
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 99, 0, 0, 1, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 1, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0,
     };
     const pixels_box = BBox{
-        .origin = .{
-            .x = 0,
-            .y = 0,
-        },
-        .size = .{
-            .width = 5,
-            .height = 5,
-        },
+        .x = 0,
+        .y = 0,
+        .width = 5,
+        .height = 5,
     };
     try tiles.setPixels(pixels_box, pixels);
 
-    var iter = tiles.areaIterator(pixels_box);
+    var iter = tiles.iterator(pixels_box);
 
-    const expected0 = &[_]types.RGBA{
-        .{}, .{},
-        .{}, .{ .red = 99 },
+    const expected0 = &[_]u8{
+        0, 0, 0, 0, 0,  0, 0, 0,
+        0, 0, 0, 0, 99, 0, 0, 1,
     };
 
     const tile0 = iter.next();
     try testing.expect(tile0 != null);
-    try testing.expectEqualSlices(types.RGBA, expected0, tile0.?.pixels);
+    try testing.expectEqualSlices(u8, expected0, tile0.?.pixels);
 
-    const expected1 = &[_]types.RGBA{
-        .{}, .{},
-        .{}, .{ .green = 10 },
+    const expected1 = &[_]u8{
+        0, 0, 0, 0, 0, 0,  0, 0,
+        0, 0, 0, 0, 0, 10, 0, 1,
     };
     const tile1 = iter.next();
     try testing.expect(tile1 != null);
-    try testing.expectEqualSlices(types.RGBA, expected1, tile1.?.pixels);
+    try testing.expectEqualSlices(u8, expected1, tile1.?.pixels);
 
     const tile2 = iter.next();
     try testing.expect(tile2 == null);
@@ -327,5 +325,5 @@ test "Draw pixels tile map" {
 const std = @import("std");
 const testing = std.testing;
 
-const types = @import("types.zig");
+const common = @import("common.zig");
 const BBox = @import("bbox.zig").BBox;
