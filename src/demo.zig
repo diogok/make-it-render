@@ -17,23 +17,14 @@ pub fn main() !void {
 
     timer.reset();
 
-    const terminus = try textz.terminus.terminus(allocator, .@"16", .n);
-    defer terminus.deinit();
-    const unifont = try textz.unifont.unifont(allocator);
-    defer unifont.deinit();
-    const unifont_jp = try textz.unifont.unifont_jp(allocator);
-    defer unifont_jp.deinit();
-
-    // pick some fonts, it will fallback until it finds a matching glyph
-    const fonts = &[_]textz.common.Font{ terminus, unifont, unifont_jp };
-
+    const fonts = try getFonts(allocator);
+    defer freeFonts(allocator, fonts);
     log.debug("Time to font: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
-    var tiles = canvas.tiles.TileMap.init(allocator, .{ .height = 256, .width = 256 });
+    var tiles = canvas.tiles.TileMap.init(allocator, .{ .height = 16, .width = 16 });
     defer tiles.deinit();
 
-    // let's draw Welcome in a few languages
-    //var welcome_imgs: [welcome.len]anywin.Image = undefined;
+    // let's draw Welcomes
     for (welcome, 0..) |txt, i| {
         // get text bitmap
         const text = try textz.render(allocator, fonts, txt);
@@ -50,18 +41,16 @@ pub fn main() !void {
         // create the image for each
         try tiles.setPixels(
             .{
-                .size = .{
-                    .height = text.height,
-                    .width = text.width,
-                },
-                .origin = .{
-                    .x = 100,
-                    .y = 100 + (@as(u8, @truncate(i)) * 20),
-                },
+                .height = text.height,
+                .width = text.width,
+                .x = 100,
+                .y = 100 + (@as(u8, @truncate(i)) * 20),
             },
-            @alignCast(std.mem.bytesAsSlice(canvas.types.RGBA, pixels)),
+            pixels,
         );
     }
+
+    log.debug("Time to tiles: {d}ms", .{timer.lap() / std.time.us_per_ms});
 
     // let's keep track of mouse position to draw it
     var mouse_x: anywin.X = 0;
@@ -82,23 +71,22 @@ pub fn main() !void {
                 try window.clear(.{});
 
                 // draw each welcome message
-                var tile_iter = tiles.areaIterator(canvas.bbox.BBox.empty);
+                var tile_iter = tiles.iterator(null);
                 while (tile_iter.next()) |tile| {
                     const img = try window.createImage(
                         .{
-                            .height = tile.area.size.height,
-                            .width = tile.area.size.width,
+                            .height = tile.bbox.height,
+                            .width = tile.bbox.width,
                         },
-                        &std.mem.toBytes(tile.pixels),
+                        tile.pixels,
                     );
-                    defer img.deinit() catch {};
-                    const target = anywin.BBox{
-                        .x = tile.area.origin.x,
-                        .y = tile.area.origin.y,
-                        .height = tile.area.size.height,
-                        .width = tile.area.size.width,
-                    };
-                    try img.draw(target);
+                    try img.draw(.{
+                        .x = tile.bbox.x,
+                        .y = tile.bbox.x,
+                        .height = tile.bbox.height,
+                        .width = tile.bbox.width,
+                    });
+                    try img.deinit();
                 }
 
                 // draw mouse position
@@ -111,6 +99,8 @@ pub fn main() !void {
                     };
                     try img.draw(target);
                 }
+
+                try wm.flush();
 
                 log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.us_per_ms});
             },
@@ -152,10 +142,31 @@ pub fn main() !void {
 
                 // ask to redraw everything
                 try window.redraw(.{});
+                try wm.flush();
             },
             else => {},
         }
     }
+}
+
+fn getFonts(allocator: std.mem.Allocator) ![]const textz.common.Font {
+    const terminus = try textz.terminus.terminus(allocator, .@"16", .n);
+    const unifont = try textz.unifont.unifont(allocator);
+    const unifont_jp = try textz.unifont.unifont_jp(allocator);
+
+    const fonts = try allocator.alloc(textz.common.Font, 3);
+    fonts[0] = terminus;
+    fonts[1] = unifont;
+    fonts[2] = unifont_jp;
+
+    return fonts;
+}
+
+fn freeFonts(allocator: std.mem.Allocator, fonts: []const textz.common.Font) void {
+    for (fonts) |font| {
+        font.deinit();
+    }
+    allocator.free(fonts);
 }
 
 const welcome = [_][]const u8{

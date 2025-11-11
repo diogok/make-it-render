@@ -248,7 +248,8 @@ pub const Window = struct {
         try x11.send(self.wm.conn, map_req);
     }
 
-    pub fn createImage(self: *@This(), size: common.Size, pixels: common.Pixels) !Image {
+    pub fn createImage(self: *@This(), size: common.Size, pixels: []const u8) !Image {
+        std.debug.assert(pixels.len % 4 == 0);
         return Image.init(self, size, pixels);
     }
 
@@ -281,9 +282,8 @@ pub const Image = struct {
     window: *Window,
     image_id: u32,
     size: common.Size,
-    pixels: common.Pixels,
 
-    pub fn init(window: *Window, size: common.Size, pixels: common.Pixels) !@This() {
+    pub fn init(window: *Window, size: common.Size, pixels: []const u8) !@This() {
         const pixmap_id = try window.wm.xid.genID();
 
         const pixmap_req = x11.proto.CreatePixmap{
@@ -300,7 +300,6 @@ pub const Image = struct {
             .image_id = pixmap_id,
             .window = window,
             .size = size,
-            .pixels = pixels,
         };
 
         if (pixels.len > 0) {
@@ -310,7 +309,9 @@ pub const Image = struct {
         return self;
     }
 
-    fn setPixels(self: @This(), pixels: common.Pixels) !void {
+    fn setPixels(self: @This(), pixels: []const u8) !void {
+        std.debug.assert(pixels.len % 4 == 0);
+
         const image_info = x11.getImageInfo(self.window.wm.info, self.window.root);
 
         var fixed_reader = std.Io.Reader.fixed(pixels);
