@@ -38,7 +38,6 @@ pub fn write(writer: *std.Io.Writer, request: anytype) !void {
 /// It re-calculate the apropriate length and add needed padding.
 /// Use with Request structs from proto namespace that require additional data to be sent.
 pub fn stream(writer: *std.Io.Writer, request: anytype, reader: *std.Io.Reader, extra_len: usize) !void {
-    log.warn("Stream!!", .{});
     const req_bytes = request_bytes_fixed_len(request, extra_len);
 
     // calculate padding and send it
