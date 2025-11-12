@@ -19,10 +19,10 @@ pub fn main() !void {
 
     const fonts = try getFonts(allocator);
     defer freeFonts(allocator, fonts);
-    log.debug("Time to font: {d}ms", .{timer.lap() / std.time.ns_per_ms});
+    log.debug("Time to load fonts: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
-    var tiles = canvas.tiles.TileMap.init(allocator, .{ .height = 16, .width = 16 });
-    defer tiles.deinit();
+    var canvas = make_it_render.glue.Canvas.init(allocator, &window);
+    defer canvas.deinit();
 
     // let's draw Welcomes
     for (welcome, 0..) |txt, i| {
@@ -39,7 +39,7 @@ pub fn main() !void {
         defer allocator.free(pixels);
 
         // create the image for each
-        try tiles.setPixels(
+        _ = try canvas.createImage(
             .{
                 .height = text.height,
                 .width = text.width,
@@ -50,17 +50,14 @@ pub fn main() !void {
         );
     }
 
-    log.debug("Time to tiles: {d}ms", .{timer.lap() / std.time.us_per_ms});
-
-    // let's keep track of mouse position to draw it
-    var mouse_x: anywin.X = 0;
-    var mouse_y: anywin.Y = 0;
-    var mouse_pos_img: ?anywin.Image = null;
+    log.debug("Time to initial canvas: {d}ms", .{timer.lap() / std.time.us_per_ms});
 
     // show the window now that we have all ready
     try window.show();
 
     while (window.status == .open) {
+        //defer wm.flush() catch {};
+
         const event = try wm.receive();
         switch (event) {
             .close => {
@@ -68,39 +65,12 @@ pub fn main() !void {
             },
             .draw => {
                 timer.reset();
-                try window.clear(.{});
+                //try window.clear(.{});
 
                 // draw each welcome message
-                var tile_iter = tiles.iterator(null);
-                while (tile_iter.next()) |tile| {
-                    const img = try window.createImage(
-                        .{
-                            .height = tile.bbox.height,
-                            .width = tile.bbox.width,
-                        },
-                        tile.pixels,
-                    );
-                    try img.draw(.{
-                        .x = tile.bbox.x,
-                        .y = tile.bbox.x,
-                        .height = tile.bbox.height,
-                        .width = tile.bbox.width,
-                    });
-                    try img.deinit();
-                }
-
-                // draw mouse position
-                if (mouse_pos_img) |img| {
-                    const target = anywin.BBox{
-                        .x = mouse_x - 20,
-                        .y = mouse_y - 20,
-                        .height = img.size.height,
-                        .width = img.size.width,
-                    };
-                    try img.draw(target);
-                }
-
-                try wm.flush();
+                //try make_it_render.glue.drawCanvasToWindows(&tiles, &window);
+                try canvas.draw();
+                //try wm.flush();
 
                 log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.us_per_ms});
             },
@@ -108,15 +78,8 @@ pub fn main() !void {
                 log.debug("{any}", .{event});
             },
             .mouse_moved => |move| {
-                mouse_x = move.x;
-                mouse_y = move.y;
-
-                if (mouse_pos_img) |img| {
-                    try img.deinit();
-                }
-
                 // fmt text
-                const mouse_pos_txt = try std.fmt.allocPrint(allocator, "{d}x{d}", .{ mouse_x, mouse_y });
+                const mouse_pos_txt = try std.fmt.allocPrint(allocator, "{d}x{d}", .{ move.x, move.y });
                 defer allocator.free(mouse_pos_txt);
 
                 // render text
@@ -131,18 +94,19 @@ pub fn main() !void {
                 );
                 defer allocator.free(mouse_pos_pixels);
 
-                // update the image
-                mouse_pos_img = try window.createImage(
+                _ = try canvas.createImage(
                     .{
                         .height = mouse_pos_bitmap.height,
                         .width = mouse_pos_bitmap.width,
+                        .x = move.x - 20,
+                        .y = move.y - 20,
                     },
                     mouse_pos_pixels,
                 );
 
                 // ask to redraw everything
                 try window.redraw(.{});
-                try wm.flush();
+                //try wm.flush();
             },
             else => {},
         }
@@ -186,7 +150,7 @@ const make_it_render = @import("make_it_render");
 
 const anywin = make_it_render.anywindow;
 const textz = make_it_render.textz;
-const canvas = make_it_render.canvas;
+//const canvas = make_it_render.canvas;
 
 const log = std.log.scoped(.demo);
 

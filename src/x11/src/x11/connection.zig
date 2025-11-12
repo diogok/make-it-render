@@ -10,7 +10,7 @@ pub const ConnectionOptions = struct {
     /// Read timeout in microseconds (5000 => 5ms)
     read_timeout: i32 = 5000, // 5ms in microseconds
     /// Write timeout in microseconds (5000 => 5ms)
-    write_timeout: i32 = 5000, // 5ms in microseconds
+    write_timeout: i32 = 15000, // 15ms in microseconds
 };
 
 /// Connects to local X11 server.

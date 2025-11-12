@@ -35,7 +35,7 @@ pub const WindowManager = struct {
             .wm_delete_window = try x11.internAtom(conn, "WM_DELETE_WINDOW"),
         };
 
-        const net_writer_buffer: []u8 = try allocator.alloc(u8, 1024 * 1024 * 1024);
+        const net_writer_buffer: []u8 = try allocator.alloc(u8, 4 * 1024 * 1024);
         const net_writer = try allocator.create(std.net.Stream.Writer);
         net_writer.* = conn.writer(net_writer_buffer);
 
@@ -140,7 +140,15 @@ pub const WindowManager = struct {
     }
 
     pub fn flush(self: *@This()) !void {
-        try self.net_writer.interface.flush();
+        self.net_writer.interface.flush() catch |err| {
+            if (self.net_writer.err) |net_err| {
+                log.err("Net error: {any}", .{net_err});
+                return net_err;
+            } else {
+                log.err("Writer error: {any}", .{err});
+                return err;
+            }
+        };
     }
 };
 
@@ -159,6 +167,8 @@ pub const Window = struct {
     depth: u8,
     root: u32,
     graphic_context_id: u32,
+
+    redraw_timer: std.time.Timer,
 
     pub fn init(wm: *WindowManager, options: common.WindowOptions) !@This() {
         const window_id = try wm.xid.genID();
@@ -226,6 +236,8 @@ pub const Window = struct {
         };
         try x11.sendWithValues(wm.conn, create_gc, graphic_context_values);
 
+        const redraw_timer = try std.time.Timer.start();
+
         return @This(){
             .window_id = window_id,
             .wm = wm,
@@ -234,6 +246,8 @@ pub const Window = struct {
             .root = wm.info.screens[0].root,
             .depth = wm.info.screens[0].root_depth,
             .graphic_context_id = graphic_context_id,
+
+            .redraw_timer = redraw_timer,
         };
     }
 
@@ -262,10 +276,12 @@ pub const Window = struct {
             .width = area.width,
         };
 
-        try x11.write(&self.wm.net_writer.interface, clear_area);
+        //try x11.write(&self.wm.net_writer.interface, clear_area);
+        try x11.send(self.wm.conn, clear_area);
     }
 
     pub fn redraw(self: *@This(), area: common.BBox) !void {
+        if (self.redraw_timer.lap() < 5 * std.time.ns_per_ms) return;
         const clear_area = x11.proto.ClearArea{
             .window_id = self.window_id,
             .x = area.x,
@@ -305,6 +321,7 @@ pub const Image = struct {
         if (pixels.len > 0) {
             try self.setPixels(pixels);
         }
+        //try window.wm.flush();
 
         return self;
     }
@@ -341,6 +358,7 @@ pub const Image = struct {
             .dst_y = target.y,
         };
         try x11.write(&self.window.wm.net_writer.interface, copy_area_req);
+        //try x11.send(self.window.wm.conn, copy_area_req);
     }
 
     pub fn deinit(self: @This()) !void {
@@ -348,5 +366,6 @@ pub const Image = struct {
             .pixmap_id = self.image_id,
         };
         try x11.write(&self.window.wm.net_writer.interface, free_image_req);
+        //try x11.send(self.window.wm.conn, free_image_req);
     }
 };

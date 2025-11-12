@@ -104,6 +104,9 @@ pub const RgbaToZPixmapReader = struct {
     reader: *std.Io.Reader,
 
     interface_state: std.Io.Reader,
+
+    buffer: [1024]u8 = undefined,
+
     pub fn init(_: ImageInfo, reader: *std.Io.Reader) @This() {
         return @This(){
             //.buffer = undefined,
@@ -127,26 +130,23 @@ pub const RgbaToZPixmapReader = struct {
     fn rgbaToZPixmapStream(
         reader: *std.Io.Reader,
         writer: *std.Io.Writer,
-        _: std.Io.Limit,
+        limit: std.Io.Limit,
     ) std.Io.Reader.StreamError!usize {
         const self: *@This() = @alignCast(@fieldParentPtr("interface_state", reader));
 
-        var count: usize = 0;
-        while (true) {
-            const buffer = self.reader.take(4) catch |err| {
-                switch (err) {
-                    error.EndOfStream => break,
-                    error.ReadFailed => return err,
-                }
-            };
+        var len: usize = 0;
+        while (len < limit.toInt().?) {
+            const buffer = limit.subtract(len).?.slice(&self.buffer);
+            try self.reader.readSliceAll(buffer);
             rgbaToZPixmap(buffer);
             if (buffer.len != 0) {
-                count += try writer.write(buffer);
+                try writer.writeAll(buffer);
+                len += buffer.len;
             } else {
                 break;
             }
         }
-        return count;
+        return len;
     }
 };
 

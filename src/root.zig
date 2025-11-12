@@ -9,7 +9,4 @@ pub const canvas = @import("canvas");
 
 pub const glue = @import("glue.zig");
 
-pub const TextRenderer = glue.TextRenderer;
-pub const CreatedImage = glue.CreatedImage;
-
 test {}

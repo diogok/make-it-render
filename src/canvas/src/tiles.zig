@@ -3,6 +3,8 @@ pub const Tile = struct {
     bbox: BBox,
     /// pixels of the tile
     pixels: []u8,
+    /// track if tiles has been changed
+    dirty: bool = false,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -18,13 +20,13 @@ pub const Tile = struct {
         };
     }
 
-    pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
         allocator.free(self.pixels);
     }
 
     /// if the points is contained in this tile, set the color for the pixel
     /// returns true if pixel was set, thus contained. returns false otherwise
-    pub fn maybeSetPixel(self: @This(), point: common.Point, pixel: []const u8) bool {
+    pub fn maybeSetPixel(self: *@This(), point: common.Point, pixel: []const u8) bool {
         std.debug.assert(pixel.len % 4 == 0);
         if (self.bbox.containsPoint(point)) {
             self.setPixel(point, pixel);
@@ -33,11 +35,12 @@ pub const Tile = struct {
         return false;
     }
 
-    fn setPixel(self: @This(), point: common.Point, pixel: []const u8) void {
+    fn setPixel(self: *@This(), point: common.Point, pixel: []const u8) void {
         std.debug.assert(pixel.len % 4 == 0);
         const fixed_point = self.bbox.internalPoint(point);
         const index = indexFromPoint(self.bbox.width, fixed_point);
         std.mem.copyForwards(u8, self.pixels[index .. index + 4], pixel);
+        self.dirty = true;
     }
 };
 
@@ -60,7 +63,7 @@ test "Basic tiles" {
         .x = 0,
         .y = 0,
     };
-    const tile0 = try Tile.init(testing.allocator, bbox);
+    var tile0 = try Tile.init(testing.allocator, bbox);
     defer testing.allocator.free(tile0.pixels);
 
     try testing.expect(tile0.maybeSetPixel(.{ .x = 1, .y = 1 }, &[_]u8{ 10, 0, 0, 1 }));
@@ -86,7 +89,7 @@ test "Basic tiles 2" {
         .x = 5,
         .y = 5,
     };
-    const tile0 = try Tile.init(testing.allocator, bbox);
+    var tile0 = try Tile.init(testing.allocator, bbox);
     defer testing.allocator.free(tile0.pixels);
 
     try testing.expect(!tile0.maybeSetPixel(.{ .x = 1, .y = 1 }, &[_]u8{ 10, 0, 0, 1 }));
@@ -123,7 +126,7 @@ pub const TileMap = struct {
     }
 
     pub fn deinit(self: *@This()) void {
-        for (self.tiles.items) |tile| {
+        for (self.tiles.items) |*tile| {
             tile.deinit(self.allocator);
         }
         self.tiles.deinit(self.allocator);
@@ -137,11 +140,12 @@ pub const TileMap = struct {
         while (y < bbox.height) : (y += 1) {
             var x: i16 = 0;
             while (x < bbox.width) : (x += 1) {
-                const point: common.Point = .{ .x = x, .y = y };
-                const index: usize = indexFromPoint(bbox.width, point);
+                const out_point: common.Point = .{ .x = bbox.x + x, .y = bbox.y + y };
+                const in_point: common.Point = .{ .x = x, .y = y };
+                const index: usize = indexFromPoint(bbox.width, in_point);
                 const pixel: []const u8 = pixels[index .. index + 4];
                 if (!std.mem.eql(u8, &[_]u8{ 0, 0, 0, 0 }, pixel)) {
-                    try self.setPixel(point, pixel);
+                    try self.setPixel(out_point, pixel);
                 }
             }
         }
@@ -150,7 +154,7 @@ pub const TileMap = struct {
     pub fn setPixel(self: *@This(), point: common.Point, pixel: []const u8) !void {
         std.debug.assert(pixel.len == 4);
 
-        for (self.tiles.items) |tile| {
+        for (self.tiles.items) |*tile| {
             if (tile.maybeSetPixel(point, pixel)) {
                 return;
             }
@@ -163,7 +167,7 @@ pub const TileMap = struct {
             .height = self.tile_size.height,
             .width = self.tile_size.width,
         };
-        const tile = try Tile.init(self.allocator, bbox);
+        var tile = try Tile.init(self.allocator, bbox);
         tile.setPixel(point, pixel);
 
         try self.tiles.append(self.allocator, tile);
@@ -216,24 +220,21 @@ test "find origin" {
 }
 
 pub const TileMapIterator = struct {
-    tiles: []const Tile,
+    tiles: []Tile,
     bbox: ?BBox,
 
     pos: usize = 0,
 
-    pub fn next(self: *@This()) ?Tile {
+    pub fn next(self: *@This()) ?*Tile {
         while (self.pos < self.tiles.len) {
-            const tile = self.tiles[self.pos];
+            defer self.pos += 1;
+            var tile = self.tiles[self.pos];
             if (self.bbox) |bbox| {
                 if (tile.bbox.overlaps(bbox)) {
-                    self.pos += 1;
-                    return tile;
-                } else {
-                    self.pos += 1;
+                    return &self.tiles[self.pos];
                 }
             } else {
-                self.pos += 1;
-                return tile;
+                return &self.tiles[self.pos];
             }
         }
         return null;
@@ -327,3 +328,5 @@ const testing = std.testing;
 
 const common = @import("common.zig");
 const BBox = @import("bbox.zig").BBox;
+
+const log = std.log.scoped(.canvas);

@@ -49,7 +49,7 @@ pub fn main() !void {
                 try image.draw(target);
                 try wm.flush();
 
-                log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.us_per_ms});
+                log.info("Time to draw: {d}ms", .{timer.lap() / std.time.us_per_ms});
             },
             .mouse_pressed, .mouse_released, .key_pressed, .key_released => {
                 log.debug("{any}", .{event});

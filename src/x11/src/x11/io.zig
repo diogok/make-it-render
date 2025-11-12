@@ -46,7 +46,8 @@ pub fn stream(writer: *std.Io.Writer, request: anytype, reader: *std.Io.Reader, 
     const pad = padding[0..pad_len];
 
     try writer.writeAll(&req_bytes);
-    _ = try reader.stream(writer, std.Io.Limit.limited(extra_len));
+    const written = try reader.stream(writer, std.Io.Limit.limited(extra_len));
+    std.debug.assert(written == extra_len);
     try writer.writeAll(pad);
 }
 
