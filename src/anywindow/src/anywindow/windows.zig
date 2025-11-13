@@ -1,7 +1,3 @@
-const std = @import("std");
-const win = @import("windows");
-const common = @import("common.zig");
-
 pub const WindowManager = struct {
     allocator: std.mem.Allocator,
 
@@ -42,16 +38,10 @@ pub const WindowManager = struct {
         }
     }
 
-    pub fn flush(_: *@This()) !void {}
+    pub fn flush(_: *@This()) !void {
+        _ = win.DwmFlush();
+    }
 };
-
-var class_count: usize = 0;
-
-/// RGB to BGR
-fn commonPixelToWinPixel(src: [3]u8) u32 {
-    const dst: [4]u8 = [4]u8{ 0, src[2], src[1], src[0] };
-    return std.mem.bytesToValue(u32, &dst);
-}
 
 pub const Window = struct {
     wm: *WindowManager,
@@ -63,6 +53,9 @@ pub const Window = struct {
 
     status: common.WindowStatus,
 
+    display: ?win.DeviceContext = null,
+    bg: ?win.BrushHandler = null,
+
     pub fn init(wm: *WindowManager, options: common.WindowOptions) !@This() {
         const class_name_n = try std.fmt.allocPrint(wm.allocator, "WindowClass_{d}", .{class_count});
         defer wm.allocator.free(class_name_n);
@@ -70,6 +63,7 @@ pub const Window = struct {
 
         const class_name = try win.W(wm.allocator, class_name_n);
         const cursor = win.LoadCursorW(null, .Arrow);
+        const bg = win.CreateSolidBrush(commonPixelToWinPixel(options.background));
 
         const window_class: win.WindowClass = .{
             .style = @intFromEnum(win.ClassStyle.HREDRAW) | @intFromEnum(win.ClassStyle.VREDRAW),
@@ -77,7 +71,7 @@ pub const Window = struct {
             .instance = wm.instance,
             .class_name = class_name,
             .cursor = cursor,
-            .background = win.CreateSolidBrush(commonPixelToWinPixel(options.background)),
+            .background = bg,
         };
 
         _ = win.RegisterClassExW(&window_class);
@@ -115,10 +109,11 @@ pub const Window = struct {
             .status = .open,
             .title = title,
             .class_name = class_name,
+            .bg = bg,
         };
     }
 
-    pub fn destroy(self: *@This()) !void {
+    pub fn deinit(self: *@This()) !void {
         self.wm.allocator.free(self.title);
         self.wm.allocator.free(self.class_name);
         self.status = .closed;
@@ -134,20 +129,43 @@ pub const Window = struct {
     }
 
     pub fn clear(self: *@This(), _: common.BBox) !void {
-        _ = win.InvalidateRect(self.handle, null, true);
+        //_ = win.InvalidateRect(self.handle, null, true);
+        if (self.display) |_| {
+            var rect = win.Rect{};
+            _ = win.GetWindowRect(self.handle, &rect);
+            _ = win.FillRect(self.display, &rect, self.bg);
+        }
     }
 
     pub fn redraw(self: *@This(), _: common.BBox) !void {
         //var rect: win.Rect = std.mem.zeroes(win.Rect);
-        _ = win.InvalidateRect(self.handle, null, false);
-        _ = win.UpdateWindow(self.handle);
+        //_ = win.InvalidateRect(self.handle, null, false);
+        //_ = win.UpdateWindow(self.handle);
+        const window_id = @intFromPtr(self.handle);
+        event_queue[event_n] = .{
+            .draw = .{
+                .window_id = window_id,
+                .area = .{},
+            },
+        };
+        event_n += 1;
+    }
+
+    pub fn beginDraw(self: *@This()) !void {
+        self.display = win.GetWindowDC(self.handle);
+    }
+
+    pub fn endDraw(self: *@This()) !void {
+        const released = win.ReleaseDC(self.handle, self.display);
+        if (released != 1) {
+            const err = win.GetLastError();
+            log.err("ReleaseDC error: {any}", .{err});
+        }
     }
 };
 
 pub const Image = struct {
     window: *Window,
-
-    //image_id: u32,
     size: common.Size,
 
     bitmap: win.Bitmap,
@@ -176,7 +194,6 @@ pub const Image = struct {
             return error.ErrorCreatingImage;
         }
 
-        //_ = win.SelectObject(window.frame, bitmap);
         var self = @This(){
             .bitmap = bitmap.?,
             .window = window,
@@ -184,12 +201,17 @@ pub const Image = struct {
             .pixels = pixels,
         };
 
-        try self.setPixels(src_pixels);
+        if (src_pixels.len != 0) {
+            try self.setPixels(src_pixels);
+        }
 
         return self;
     }
 
-    fn setPixels(self: @This(), src_pixels: []const u8) !void {
+    pub fn setPixels(self: @This(), src_pixels: []const u8) !void {
+        std.debug.assert(src_pixels.len % 4 == 0);
+        std.debug.assert(src_pixels.len == self.size.height * self.size.width * 4);
+
         var i: usize = 0;
         while (i < src_pixels.len) : (i += 4) {
             // RGB to BGR
@@ -203,17 +225,8 @@ pub const Image = struct {
     pub fn draw(self: @This(), target: common.BBox) !void {
         _ = win.SelectObject(self.window.frame, self.bitmap);
 
-        const display = win.GetWindowDC(self.window.handle);
-        defer {
-            const released = win.ReleaseDC(self.window.handle, display);
-            if (released != 1) {
-                const err = win.GetLastError();
-                log.err("ReleaseDC error: {any}", .{err});
-            }
-        }
-
         const bitBltResult = win.BitBlt(
-            display,
+            self.window.display,
             target.x,
             target.y,
             target.width,
@@ -223,18 +236,20 @@ pub const Image = struct {
             0,
             .SRCCOPY,
         );
+
         if (!bitBltResult) {
             const err = win.GetLastError();
             log.err("BitBlt error: {any}", .{err});
             return error.ErrorBitBlt;
         }
-        //_ = win.DwmFlush(); // wait for vsync, kinda
     }
 
     pub fn deinit(self: @This()) !void {
         _ = win.DeleteObject(self.bitmap);
     }
 };
+
+var class_count: usize = 0;
 
 var event_n: u8 = 0;
 var event_queue: [256]common.Event = undefined;
@@ -247,24 +262,35 @@ pub fn windowProc(
 ) callconv(.winapi) isize {
     defer event_n += 1;
 
-    const windowID = @intFromPtr(window_handle);
+    const window_id = @intFromPtr(window_handle);
     switch (message_type) {
         .WM_DESTROY => {
-            event_queue[event_n] = .{ .close = windowID };
+            event_queue[event_n] = .{ .close = window_id };
+        },
+        .WM_ERASEBKGND => {
+            event_queue[event_n] = .{ .nop = {} };
         },
         .WM_PAINT => {
             var rect: win.Rect = std.mem.zeroes(win.Rect);
             _ = win.GetUpdateRect(window_handle, &rect, false);
 
-            event_queue[event_n] = .{ .draw = .{
-                .window_id = windowID,
-                .area = .{},
-            } };
+            event_queue[event_n] = .{
+                .draw = .{
+                    .window_id = window_id,
+                    .area = .{},
+                },
+            };
 
             var paint = std.mem.zeroes(win.Paint);
-            _ = win.BeginPaint(window_handle, &paint);
+            const hdc = win.BeginPaint(window_handle, &paint);
+            const hMemDC = win.CreateCompatibleDC(hdc);
+
+            // TODO: paint in here
+
             _ = win.EndPaint(window_handle, &paint);
-            _ = win.DwmFlush(); // wait for vsync, kinda
+            _ = win.DeleteObject(hMemDC);
+
+            _ = win.DwmFlush();
         },
         .WM_LBUTTONDOWN => {
             const x = win.loword(lparam);
@@ -275,7 +301,7 @@ pub fn windowProc(
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 1,
-                    .window_id = windowID,
+                    .window_id = window_id,
                 },
             };
         },
@@ -288,7 +314,7 @@ pub fn windowProc(
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 1,
-                    .window_id = windowID,
+                    .window_id = window_id,
                 },
             };
         },
@@ -301,7 +327,7 @@ pub fn windowProc(
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 2,
-                    .window_id = windowID,
+                    .window_id = window_id,
                 },
             };
         },
@@ -313,7 +339,7 @@ pub fn windowProc(
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 2,
-                    .window_id = windowID,
+                    .window_id = window_id,
                 },
             };
         },
@@ -326,7 +352,7 @@ pub fn windowProc(
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 3,
-                    .window_id = windowID,
+                    .window_id = window_id,
                 },
             };
         },
@@ -339,7 +365,7 @@ pub fn windowProc(
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 3,
-                    .window_id = windowID,
+                    .window_id = window_id,
                 },
             };
         },
@@ -351,7 +377,7 @@ pub fn windowProc(
                 .mouse_moved = .{
                     .x = @intCast(x),
                     .y = @intCast(y),
-                    .window_id = windowID,
+                    .window_id = window_id,
                 },
             };
         },
@@ -362,7 +388,7 @@ pub fn windowProc(
             event_queue[event_n] = .{
                 .key_pressed = .{
                     .key = 0,
-                    .window_id = windowID,
+                    .window_id = window_id,
                 },
             };
         },
@@ -370,7 +396,7 @@ pub fn windowProc(
             event_queue[event_n] = .{
                 .key_released = .{
                     .key = 0,
-                    .window_id = windowID,
+                    .window_id = window_id,
                 },
             };
         },
@@ -379,7 +405,17 @@ pub fn windowProc(
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
         },
     }
-    return 0;
+    return 1;
 }
+
+/// RGB to ABGR
+fn commonPixelToWinPixel(src: [3]u8) u32 {
+    const dst: [4]u8 = [4]u8{ 0, src[2], src[1], src[0] };
+    return std.mem.bytesToValue(u32, &dst);
+}
+
+const std = @import("std");
+const win = @import("windows");
+const common = @import("common.zig");
 
 const log = std.log.scoped(.any_win32);

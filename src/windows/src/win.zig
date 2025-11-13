@@ -227,6 +227,7 @@ pub const MessageType = enum(u32) {
     WM_XBUTTONUP = 0x020C,
     WM_XBUTTONDBLCLK = 0x02D,
     WM_MOUSEHWHEEL = 0x020E,
+    WM_ERASEBKGND = 0x0014,
     _,
 };
 
@@ -362,6 +363,17 @@ pub extern "user32" fn GetSysColorBrush(
 pub extern "gdi32" fn CreateSolidBrush(
     color: u32,
 ) callconv(.winapi) ?BrushHandler;
+
+pub extern "user32" fn FillRect(
+    handle: ?DeviceContext,
+    rect: ?*Rect,
+    brush: ?BrushHandler,
+) callconv(.winapi) i32;
+
+pub extern "user32" fn GetWindowRect(
+    handle: ?DeviceContext,
+    rect: ?*Rect,
+) callconv(.winapi) i32;
 
 pub const DeviceContext = *anyopaque;
 pub const Bitmap = *anyopaque;

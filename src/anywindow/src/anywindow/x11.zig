@@ -35,7 +35,7 @@ pub const WindowManager = struct {
             .wm_delete_window = try x11.internAtom(conn, "WM_DELETE_WINDOW"),
         };
 
-        const net_writer_buffer: []u8 = try allocator.alloc(u8, 4 * 1024 * 1024);
+        const net_writer_buffer: []u8 = try allocator.alloc(u8, 4 * 1024);
         const net_writer = try allocator.create(std.net.Stream.Writer);
         net_writer.* = conn.writer(net_writer_buffer);
 
@@ -152,12 +152,6 @@ pub const WindowManager = struct {
     }
 };
 
-/// RGB to BGR
-fn commonPixelToX11Pixel(src: [3]u8) u32 {
-    const dst: [4]u8 = [4]u8{ 1, src[2], src[1], src[0] };
-    return std.mem.bytesToValue(u32, &dst);
-}
-
 pub const Window = struct {
     window_id: u32,
     wm: *WindowManager,
@@ -251,7 +245,7 @@ pub const Window = struct {
         };
     }
 
-    pub fn destroy(self: *@This()) !void {
+    pub fn deinit(self: *@This()) !void {
         try x11.send(self.wm.conn, x11.proto.UnmapWindow{ .window_id = self.window_id });
         try x11.send(self.wm.conn, x11.proto.DestroyWindow{ .window_id = self.window_id });
         self.status = .closed;
@@ -276,8 +270,8 @@ pub const Window = struct {
             .width = area.width,
         };
 
-        //try x11.write(&self.wm.net_writer.interface, clear_area);
-        try x11.send(self.wm.conn, clear_area);
+        try x11.write(&self.wm.net_writer.interface, clear_area);
+        //try x11.send(self.wm.conn, clear_area);
     }
 
     pub fn redraw(self: *@This(), area: common.BBox) !void {
@@ -291,6 +285,12 @@ pub const Window = struct {
             .exposures = true,
         };
         try x11.send(self.wm.conn, clear_area);
+    }
+
+    pub fn beginDraw(_: *@This()) !void {}
+
+    pub fn endDraw(self: *@This()) !void {
+        try self.wm.flush();
     }
 };
 
@@ -326,8 +326,9 @@ pub const Image = struct {
         return self;
     }
 
-    fn setPixels(self: @This(), pixels: []const u8) !void {
+    pub fn setPixels(self: @This(), pixels: []const u8) !void {
         std.debug.assert(pixels.len % 4 == 0);
+        std.debug.assert(pixels.len == self.size.height * self.size.width * 4);
 
         const image_info = x11.getImageInfo(self.window.wm.info, self.window.root);
 
@@ -369,3 +370,9 @@ pub const Image = struct {
         //try x11.send(self.window.wm.conn, free_image_req);
     }
 };
+
+/// RGB to ABGR
+fn commonPixelToX11Pixel(src: [3]u8) u32 {
+    const dst: [4]u8 = [4]u8{ 1, src[2], src[1], src[0] };
+    return std.mem.bytesToValue(u32, &dst);
+}

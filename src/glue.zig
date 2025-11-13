@@ -51,16 +51,17 @@ pub const Canvas = struct {
     pub const Image = struct {
         image: *anywin.Image,
         bbox: anywin.common.BBox,
+        pixels: []const u8,
     };
 
     window: *anywin.Window,
-    images: std.ArrayList(Image),
+    images: std.ArrayList(*Image),
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator, window: *anywin.Window) @This() {
         return @This(){
             .window = window,
-            .images = std.ArrayList(Image){},
+            .images = std.ArrayList(*Image){},
             .allocator = allocator,
         };
     }
@@ -68,11 +69,12 @@ pub const Canvas = struct {
     pub fn deinit(self: *@This()) void {
         for (self.images.items) |image| {
             self.allocator.destroy(image.image);
+            self.allocator.destroy(image);
         }
         self.images.deinit(self.allocator);
     }
 
-    pub fn createImage(self: *@This(), bbox: anywin.common.BBox, pixels: []const u8) !Image {
+    pub fn createImage(self: *@This(), bbox: anywin.common.BBox, pixels: []const u8) !*Image {
         const img = try self.allocator.create(anywin.Image);
         errdefer self.allocator.destroy(img);
 
@@ -82,9 +84,11 @@ pub const Canvas = struct {
         );
         try self.window.wm.flush();
 
-        const image = Image{
+        const image = try self.allocator.create(Image);
+        image.* = Image{
             .image = img,
             .bbox = bbox,
+            .pixels = pixels,
         };
 
         try self.images.append(self.allocator, image);
@@ -92,12 +96,19 @@ pub const Canvas = struct {
         return image;
     }
 
-    pub fn removeImage(self: *@This(), image: Image) void {
+    pub fn updateImage(self: *@This(), image: *Image) !void {
+        try image.image.setPixels(image.pixels);
+        try self.window.wm.flush();
+    }
+
+    pub fn removeImage(self: *@This(), image: *Image) void {
         _ = self;
         _ = image;
     }
 
     pub fn draw(self: *@This()) !void {
+        try self.window.beginDraw();
+        try self.window.clear(.{});
         for (self.images.items) |image| {
             try image.image.draw(.{
                 .x = image.bbox.x,
@@ -106,7 +117,8 @@ pub const Canvas = struct {
                 .height = image.bbox.height,
             });
         }
-        try self.window.wm.flush();
+        try self.window.endDraw();
+        //try self.window.wm.flush();
     }
 };
 
