@@ -28,17 +28,11 @@ pub fn main() !void {
     // let's draw Welcomes
     for (welcome, 0..) |txt, i| {
         // get text bitmap
-        const text = try textz.render(allocator, fonts, txt);
+        var text = try textz.render(allocator, fonts, txt);
         defer text.deinit();
 
-        // set to pixels in color
-        const pixels = try make_it_render.glue.bitsToColor(
-            allocator,
-            .{ 255, 150, 0 },
-            text.bitmap,
-        );
-        defer allocator.free(pixels);
-        var pixel_reader = std.Io.Reader.fixed(pixels);
+        var pixel_reader = try text.pixelReader(&[_]u8{ 255, 150, 0, 1 });
+        defer pixel_reader.deinit();
 
         // create the image for each
         var img = try canvas.createImage(
@@ -49,11 +43,12 @@ pub fn main() !void {
                 .y = 100 + (@as(u8, @truncate(i)) * 20),
             },
         );
-        try img.image.setPixels(&pixel_reader);
+        try img.image.setPixels(&pixel_reader.interface);
+        try wm.flush();
     }
 
     // render text to get size
-    const mouse_pos_bitmap = try textz.render(allocator, fonts, "00000x00000");
+    var mouse_pos_bitmap = try textz.render(allocator, fonts, "00000x00000");
     defer mouse_pos_bitmap.deinit();
 
     var mouse_pos_img = try canvas.createImage(
@@ -95,19 +90,13 @@ pub fn main() !void {
                 defer allocator.free(mouse_pos_txt2);
 
                 // render text
-                const mouse_pos_bitmap2 = try textz.render(allocator, fonts, mouse_pos_txt2);
+                var mouse_pos_bitmap2 = try textz.render(allocator, fonts, mouse_pos_txt2);
                 defer mouse_pos_bitmap2.deinit();
 
-                // create pixels in color
-                const mouse_pos_pixels2 = try make_it_render.glue.bitsToColor(
-                    allocator,
-                    .{ 255, 150, 0 },
-                    mouse_pos_bitmap2.bitmap,
-                );
-                defer allocator.free(mouse_pos_pixels2);
-                var pixel_reader2 = std.Io.Reader.fixed(mouse_pos_pixels2);
+                var pixel_reader2 = try mouse_pos_bitmap2.pixelReader(&[_]u8{ 255, 150, 0, 1 });
+                defer pixel_reader2.deinit();
 
-                try mouse_pos_img.image.setPixels(&pixel_reader2);
+                try mouse_pos_img.image.setPixels(&pixel_reader2.interface);
                 try wm.flush();
 
                 mouse_pos_img.bbox.x = move.x;
