@@ -45,8 +45,8 @@ pub const WindowManager = struct {
 
 pub const Window = struct {
     wm: *WindowManager,
-    handle: win.WindowHandle,
-    frame: win.DeviceContext,
+    handle: ?win.WindowHandle,
+    frame: ?win.DeviceContext,
     class_name: [:0]u16,
 
     title: [:0]u16,
@@ -54,7 +54,7 @@ pub const Window = struct {
     status: common.WindowStatus,
 
     display: ?win.DeviceContext = null,
-    bg: ?win.BrushHandler = null,
+    background: ?win.BrushHandler = null,
 
     pub fn init(wm: *WindowManager, options: common.WindowOptions) !@This() {
         const class_name_n = try std.fmt.allocPrint(wm.allocator, "WindowClass_{d}", .{class_count});
@@ -63,7 +63,7 @@ pub const Window = struct {
 
         const class_name = try win.W(wm.allocator, class_name_n);
         const cursor = win.LoadCursorW(null, .Arrow);
-        const bg = win.CreateSolidBrush(commonPixelToWinPixel(options.background));
+        const background = win.CreateSolidBrush(commonPixelToWinPixel(options.background));
 
         const window_class: win.WindowClass = .{
             .style = @intFromEnum(win.ClassStyle.HREDRAW) | @intFromEnum(win.ClassStyle.VREDRAW),
@@ -71,7 +71,7 @@ pub const Window = struct {
             .instance = wm.instance,
             .class_name = class_name,
             .cursor = cursor,
-            .background = bg,
+            .background = background,
         };
 
         _ = win.RegisterClassExW(&window_class);
@@ -104,18 +104,21 @@ pub const Window = struct {
 
         return @This(){
             .wm = wm,
-            .handle = handle.?,
-            .frame = frame_handle.?,
+            .handle = handle,
+            .frame = frame_handle,
             .status = .open,
             .title = title,
             .class_name = class_name,
-            .bg = bg,
+            .background = background,
         };
     }
 
-    pub fn deinit(self: *@This()) !void {
+    pub fn deinit(self: *@This()) void {
         self.wm.allocator.free(self.title);
         self.wm.allocator.free(self.class_name);
+    }
+
+    pub fn close(self: *@This()) void {
         self.status = .closed;
     }
 
@@ -124,8 +127,8 @@ pub const Window = struct {
         while (win.ShowCursor(true) < 1) {}
     }
 
-    pub fn createImage(self: *@This(), size: common.Size, pixels: []const u8) !Image {
-        return Image.init(self, size, pixels);
+    pub fn createImage(self: *@This(), size: common.Size) !Image {
+        return Image.init(self, size);
     }
 
     pub fn clear(self: *@This(), _: common.BBox) !void {
@@ -133,7 +136,7 @@ pub const Window = struct {
         if (self.display) |_| {
             var rect = win.Rect{};
             _ = win.GetWindowRect(self.handle, &rect);
-            _ = win.FillRect(self.display, &rect, self.bg);
+            _ = win.FillRect(self.display, &rect, self.background);
         }
     }
 
@@ -145,7 +148,6 @@ pub const Window = struct {
         event_queue[event_n] = .{
             .draw = .{
                 .window_id = window_id,
-                .area = .{},
             },
         };
         event_n += 1;
@@ -171,7 +173,7 @@ pub const Image = struct {
     bitmap: win.Bitmap,
     pixels: [*]u8,
 
-    pub fn init(window: *Window, size: common.Size, src_pixels: []const u8) !@This() {
+    pub fn init(window: *Window, size: common.Size) !@This() {
         var pixels: [*]u8 = undefined;
         const bitmap_info = win.BitmapInfo{
             .header = .{
@@ -194,31 +196,29 @@ pub const Image = struct {
             return error.ErrorCreatingImage;
         }
 
-        var self = @This(){
+        return @This(){
             .bitmap = bitmap.?,
             .window = window,
             .size = size,
             .pixels = pixels,
         };
-
-        if (src_pixels.len != 0) {
-            try self.setPixels(src_pixels);
-        }
-
-        return self;
     }
 
-    pub fn setPixels(self: @This(), src_pixels: []const u8) !void {
-        std.debug.assert(src_pixels.len % 4 == 0);
-        std.debug.assert(src_pixels.len == self.size.height * self.size.width * 4);
-
+    pub fn setPixels(self: @This(), reader: *std.Io.Reader) !void {
         var i: usize = 0;
-        while (i < src_pixels.len) : (i += 4) {
+        while (true) {
+            defer i += 4;
+            const src_pixels = reader.take(4) catch |err| {
+                switch (err) {
+                    error.EndOfStream => break,
+                    error.ReadFailed => return err,
+                }
+            };
             // RGB to BGR
-            self.pixels[i] = src_pixels[i + 2];
-            self.pixels[i + 1] = src_pixels[i + 1];
-            self.pixels[i + 2] = src_pixels[i];
-            self.pixels[i + 3] = src_pixels[i + 3];
+            self.pixels[i] = src_pixels[2];
+            self.pixels[i + 1] = src_pixels[1];
+            self.pixels[i + 2] = src_pixels[0];
+            self.pixels[i + 3] = src_pixels[3];
         }
     }
 
@@ -244,7 +244,7 @@ pub const Image = struct {
         }
     }
 
-    pub fn deinit(self: @This()) !void {
+    pub fn deinit(self: @This()) void {
         _ = win.DeleteObject(self.bitmap);
     }
 };

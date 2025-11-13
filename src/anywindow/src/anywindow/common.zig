@@ -4,12 +4,23 @@ pub const Height = u16;
 pub const Width = u16;
 pub const X = i16;
 pub const Y = i16;
+
 pub const Key = u16;
 pub const MouseButton = u8;
 
 pub const BBox = struct {
     height: Height = 0,
     width: Width = 0,
+    x: X = 0,
+    y: Y = 0,
+};
+
+pub const Size = struct {
+    width: Width = 0,
+    height: Height = 0,
+};
+
+pub const Position = struct {
     x: X = 0,
     y: Y = 0,
 };
@@ -28,22 +39,12 @@ pub const WindowStatus = enum {
     closed,
 };
 
-pub const Size = struct {
-    width: Width,
-    height: Height,
-};
-
-pub const Position = struct {
-    x: X = 0,
-    y: Y = 0,
-};
-
 pub const Event = union(enum) {
     nop: void,
     close: WindowID,
     draw: struct {
         window_id: WindowID,
-        area: BBox,
+        area: BBox = .{},
     },
     mouse_pressed: struct {
         x: X,

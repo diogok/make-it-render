@@ -51,7 +51,6 @@ pub const Canvas = struct {
     pub const Image = struct {
         image: *anywin.Image,
         bbox: anywin.common.BBox,
-        pixels: []const u8,
     };
 
     window: *anywin.Window,
@@ -74,31 +73,22 @@ pub const Canvas = struct {
         self.images.deinit(self.allocator);
     }
 
-    pub fn createImage(self: *@This(), bbox: anywin.common.BBox, pixels: []const u8) !*Image {
+    pub fn createImage(self: *@This(), bbox: anywin.common.BBox) !*Image {
         const img = try self.allocator.create(anywin.Image);
         errdefer self.allocator.destroy(img);
 
-        img.* = try self.window.createImage(
-            .{ .width = bbox.width, .height = bbox.height },
-            pixels,
-        );
+        img.* = try self.window.createImage(.{ .width = bbox.width, .height = bbox.height });
         try self.window.wm.flush();
 
         const image = try self.allocator.create(Image);
         image.* = Image{
             .image = img,
             .bbox = bbox,
-            .pixels = pixels,
         };
 
         try self.images.append(self.allocator, image);
 
         return image;
-    }
-
-    pub fn updateImage(self: *@This(), image: *Image) !void {
-        try image.image.setPixels(image.pixels);
-        try self.window.wm.flush();
     }
 
     pub fn removeImage(self: *@This(), image: *Image) void {
@@ -118,7 +108,6 @@ pub const Canvas = struct {
             });
         }
         try self.window.endDraw();
-        //try self.window.wm.flush();
     }
 };
 

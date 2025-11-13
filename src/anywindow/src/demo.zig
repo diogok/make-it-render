@@ -11,6 +11,7 @@ pub fn main() !void {
             .title = "hello, world.",
         },
     );
+    defer window.deinit();
     try window.show();
 
     // Let's make a little yellow triangle
@@ -24,21 +25,26 @@ pub fn main() !void {
         y, y, y, y, y,
     };
     var pixels = std.mem.toBytes(yellow_block);
+    var pixel_reader = std.Io.Reader.fixed(&pixels);
 
-    var image = try window.createImage(.{ .height = 5, .width = 5 }, &pixels);
-    defer image.deinit() catch unreachable;
+    var image = try window.createImage(.{ .height = 5, .width = 5 });
+    defer image.deinit();
+    try image.setPixels(&pixel_reader);
     try wm.flush();
 
     var timer = try std.time.Timer.start();
 
+    try window.redraw(.{});
     while (window.status == .open) {
         const event = try wm.receive();
         switch (event) {
             .close => {
-                try window.destroy();
+                window.close();
             },
             .draw => {
                 timer.reset();
+
+                try window.beginDraw();
 
                 const target = win.BBox{
                     .x = 100,
@@ -47,9 +53,10 @@ pub fn main() !void {
                     .width = image.size.width,
                 };
                 try image.draw(target);
-                try wm.flush();
 
-                log.info("Time to draw: {d}ms", .{timer.lap() / std.time.us_per_ms});
+                try window.endDraw();
+
+                log.info("Time to draw: {d}ms", .{timer.lap() / std.time.ns_per_ms});
             },
             .mouse_pressed, .mouse_released, .key_pressed, .key_released => {
                 log.debug("{any}", .{event});

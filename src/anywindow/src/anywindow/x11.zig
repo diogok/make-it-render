@@ -1,16 +1,3 @@
-const std = @import("std");
-const x11 = @import("x11");
-const common = @import("common.zig");
-const log = std.log.scoped(.any_x11);
-
-const Atoms = struct {
-    atom: u32,
-    string: u32,
-    wm_name: u32,
-    wm_protocols: u32,
-    wm_delete_window: u32,
-};
-
 pub const WindowManager = struct {
     allocator: std.mem.Allocator,
 
@@ -162,7 +149,8 @@ pub const Window = struct {
     root: u32,
     graphic_context_id: u32,
 
-    redraw_timer: std.time.Timer,
+    // to know if clear request comes after a redraw
+    redrawn: bool = false,
 
     pub fn init(wm: *WindowManager, options: common.WindowOptions) !@This() {
         const window_id = try wm.xid.genID();
@@ -230,8 +218,6 @@ pub const Window = struct {
         };
         try x11.sendWithValues(wm.conn, create_gc, graphic_context_values);
 
-        const redraw_timer = try std.time.Timer.start();
-
         return @This(){
             .window_id = window_id,
             .wm = wm,
@@ -240,14 +226,19 @@ pub const Window = struct {
             .root = wm.info.screens[0].root,
             .depth = wm.info.screens[0].root_depth,
             .graphic_context_id = graphic_context_id,
-
-            .redraw_timer = redraw_timer,
         };
     }
 
-    pub fn deinit(self: *@This()) !void {
-        try x11.send(self.wm.conn, x11.proto.UnmapWindow{ .window_id = self.window_id });
-        try x11.send(self.wm.conn, x11.proto.DestroyWindow{ .window_id = self.window_id });
+    pub fn deinit(self: *@This()) void {
+        x11.send(self.wm.conn, x11.proto.DestroyWindow{ .window_id = self.window_id }) catch |err| {
+            log.err("Error destroying window: {any}", .{err});
+        };
+    }
+
+    pub fn close(self: *@This()) void {
+        x11.send(self.wm.conn, x11.proto.UnmapWindow{ .window_id = self.window_id }) catch |err| {
+            log.err("Error unmapping window: {any}", .{err});
+        };
         self.status = .closed;
     }
 
@@ -256,12 +247,14 @@ pub const Window = struct {
         try x11.send(self.wm.conn, map_req);
     }
 
-    pub fn createImage(self: *@This(), size: common.Size, pixels: []const u8) !Image {
-        std.debug.assert(pixels.len % 4 == 0);
-        return Image.init(self, size, pixels);
+    pub fn createImage(self: *@This(), size: common.Size) !Image {
+        return Image.init(self, size);
     }
 
     pub fn clear(self: *@This(), area: common.BBox) !void {
+        if (self.redrawn) return;
+        self.redrawn = false;
+
         const clear_area = x11.proto.ClearArea{
             .window_id = self.window_id,
             .x = area.x,
@@ -275,7 +268,6 @@ pub const Window = struct {
     }
 
     pub fn redraw(self: *@This(), area: common.BBox) !void {
-        if (self.redraw_timer.lap() < 5 * std.time.ns_per_ms) return;
         const clear_area = x11.proto.ClearArea{
             .window_id = self.window_id,
             .x = area.x,
@@ -285,6 +277,7 @@ pub const Window = struct {
             .exposures = true,
         };
         try x11.send(self.wm.conn, clear_area);
+        self.redrawn = true;
     }
 
     pub fn beginDraw(_: *@This()) !void {}
@@ -299,7 +292,7 @@ pub const Image = struct {
     image_id: u32,
     size: common.Size,
 
-    pub fn init(window: *Window, size: common.Size, pixels: []const u8) !@This() {
+    pub fn init(window: *Window, size: common.Size) !@This() {
         const pixmap_id = try window.wm.xid.genID();
 
         const pixmap_req = x11.proto.CreatePixmap{
@@ -312,28 +305,17 @@ pub const Image = struct {
 
         try x11.write(&window.wm.net_writer.interface, pixmap_req);
 
-        const self = @This(){
+        return @This(){
             .image_id = pixmap_id,
             .window = window,
             .size = size,
         };
-
-        if (pixels.len > 0) {
-            try self.setPixels(pixels);
-        }
-        //try window.wm.flush();
-
-        return self;
     }
 
-    pub fn setPixels(self: @This(), pixels: []const u8) !void {
-        std.debug.assert(pixels.len % 4 == 0);
-        std.debug.assert(pixels.len == self.size.height * self.size.width * 4);
-
+    pub fn setPixels(self: @This(), src_reader: *std.Io.Reader) !void {
         const image_info = x11.getImageInfo(self.window.wm.info, self.window.root);
 
-        var fixed_reader = std.Io.Reader.fixed(pixels);
-        var reader = x11.RgbaToZPixmapReader.init(image_info, &fixed_reader);
+        var pixmap_reader = x11.RgbaToZPixmapReader.init(image_info, src_reader);
 
         const put_image_req = x11.proto.PutImage{
             .drawable_id = self.image_id,
@@ -345,7 +327,12 @@ pub const Image = struct {
             .depth = self.window.depth,
         };
 
-        try x11.stream(&self.window.wm.net_writer.interface, put_image_req, (&reader).interface(), pixels.len);
+        try x11.stream(
+            &self.window.wm.net_writer.interface,
+            put_image_req,
+            (&pixmap_reader).interface(),
+            self.size.height * self.size.width * 4,
+        );
     }
 
     pub fn draw(self: @This(), target: common.BBox) !void {
@@ -362,12 +349,14 @@ pub const Image = struct {
         //try x11.send(self.window.wm.conn, copy_area_req);
     }
 
-    pub fn deinit(self: @This()) !void {
+    pub fn deinit(self: @This()) void {
         const free_image_req = x11.proto.FreePixmap{
             .pixmap_id = self.image_id,
         };
-        try x11.write(&self.window.wm.net_writer.interface, free_image_req);
-        //try x11.send(self.window.wm.conn, free_image_req);
+        //x11.write(&self.window.wm.net_writer.interface, free_image_req);
+        x11.send(self.window.wm.conn, free_image_req) catch |err| {
+            log.err("Failed to free image: {any}", .{err});
+        };
     }
 };
 
@@ -376,3 +365,16 @@ fn commonPixelToX11Pixel(src: [3]u8) u32 {
     const dst: [4]u8 = [4]u8{ 1, src[2], src[1], src[0] };
     return std.mem.bytesToValue(u32, &dst);
 }
+
+const Atoms = struct {
+    atom: u32,
+    string: u32,
+    wm_name: u32,
+    wm_protocols: u32,
+    wm_delete_window: u32,
+};
+
+const std = @import("std");
+const x11 = @import("x11");
+const common = @import("common.zig");
+const log = std.log.scoped(.any_x11);

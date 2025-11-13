@@ -14,6 +14,7 @@ pub fn main() !void {
             .title = "hello, world.",
         },
     );
+    defer window.deinit();
 
     timer.reset();
 
@@ -37,28 +38,35 @@ pub fn main() !void {
             text.bitmap,
         );
         defer allocator.free(pixels);
+        var pixel_reader = std.Io.Reader.fixed(pixels);
 
         // create the image for each
-        _ = try canvas.createImage(
+        var img = try canvas.createImage(
             .{
                 .height = text.height,
                 .width = text.width,
                 .x = 100,
                 .y = 100 + (@as(u8, @truncate(i)) * 20),
             },
-            pixels,
         );
+        try img.image.setPixels(&pixel_reader);
     }
 
-    // demo text
-    const mouse_pos_txt = try std.fmt.allocPrint(allocator, "{d:5}x{d:5}", .{ 0, 0 });
-    defer allocator.free(mouse_pos_txt);
-
-    // render text
-    const mouse_pos_bitmap = try textz.render(allocator, fonts, mouse_pos_txt);
+    // render text to get size
+    const mouse_pos_bitmap = try textz.render(allocator, fonts, "00000x00000");
     defer mouse_pos_bitmap.deinit();
 
-    var mouse_pos_img = try canvas.createImage(.{ .x = 0, .y = 0, .height = mouse_pos_bitmap.height, .width = mouse_pos_bitmap.width }, &[_]u8{});
+    var mouse_pos_img = try canvas.createImage(
+        .{
+            .x = 0,
+            .y = 0,
+            .height = mouse_pos_bitmap.height,
+            .width = mouse_pos_bitmap.width,
+        },
+    );
+
+    // sync any pending operation
+    try wm.flush();
 
     log.debug("Time to initial canvas: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
@@ -66,12 +74,10 @@ pub fn main() !void {
     try window.show();
 
     while (window.status == .open) {
-        //defer wm.flush() catch {};
-
         const event = try wm.receive();
         switch (event) {
             .close => {
-                try window.deinit();
+                window.close();
             },
             .draw => {
                 timer.reset();
@@ -99,12 +105,13 @@ pub fn main() !void {
                     mouse_pos_bitmap2.bitmap,
                 );
                 defer allocator.free(mouse_pos_pixels2);
+                var pixel_reader2 = std.Io.Reader.fixed(mouse_pos_pixels2);
+
+                try mouse_pos_img.image.setPixels(&pixel_reader2);
+                try wm.flush();
 
                 mouse_pos_img.bbox.x = move.x;
                 mouse_pos_img.bbox.y = move.y;
-                mouse_pos_img.pixels = mouse_pos_pixels2;
-
-                try canvas.updateImage(mouse_pos_img);
 
                 // ask to redraw everything
                 try window.redraw(.{});
