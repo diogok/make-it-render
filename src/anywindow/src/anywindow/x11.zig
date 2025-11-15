@@ -9,7 +9,7 @@ pub const WindowManager = struct {
     net_writer_buffer: []u8,
     net_writer: *std.net.Stream.Writer,
 
-    redraw_requested: bool = false,
+    events: queue.Queue(common.Event),
 
     pub fn init(allocator: std.mem.Allocator) !@This() {
         const conn = try x11.connect(.{});
@@ -37,6 +37,8 @@ pub const WindowManager = struct {
 
             .net_writer_buffer = net_writer_buffer,
             .net_writer = net_writer,
+
+            .events = .init(),
         };
     }
 
@@ -52,20 +54,13 @@ pub const WindowManager = struct {
     }
 
     pub fn receive(self: *@This()) !common.Event {
-        if (self.redraw_requested) {
-            self.redraw_requested = false;
-            return .{
-                .draw = .{
-                    .window_id = 0,
-                    .area = common.BBox{
-                        .x = 0,
-                        .y = 0,
-                        .width = 0,
-                        .height = 0,
-                    },
-                },
-            };
+        if (self.events.pull()) |event| {
+            return event;
         }
+        return try self.receive0();
+    }
+
+    fn receive0(self: *@This()) !common.Event {
         if (try x11.receive(self.conn)) |message| {
             switch (message) {
                 .Expose => |expose| {
@@ -296,7 +291,13 @@ pub const Window = struct {
         // sending fake redraw event;
         //try x11.send(self.wm.conn, clear_area);
         //self.redrawn = true;
-        self.wm.redraw_requested = true;
+        self.wm.events.push(
+            .{
+                .draw = .{
+                    .window_id = self.window_id,
+                },
+            },
+        );
     }
 
     pub fn beginDraw(_: *@This()) !void {}
@@ -396,4 +397,6 @@ const Atoms = struct {
 const std = @import("std");
 const x11 = @import("x11");
 const common = @import("common.zig");
+const queue = @import("queue.zig");
+
 const log = std.log.scoped(.any_x11);

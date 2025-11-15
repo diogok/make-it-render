@@ -1,5 +1,6 @@
 pub const any = @import("anywindow/any.zig");
 pub const common = @import("anywindow/common.zig");
+const queue = @import("anywindow/queue.zig");
 
 pub const WindowManager = any.WindowManager;
 pub const Window = any.Window;
@@ -23,4 +24,5 @@ pub const Event = common.Event;
 test {
     _ = any;
     _ = common;
+    _ = queue;
 }

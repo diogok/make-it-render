@@ -21,18 +21,16 @@ pub const WindowManager = struct {
     }
 
     pub fn receive(_: *@This()) !common.Event {
-        if (event_n != 0) {
-            event_n -= 1;
-            return event_queue[event_n];
+        if (events.pull()) |event| {
+            return event;
         }
         var msg: win.Message = undefined;
         if (win.GetMessageW(&msg, null, 0, 0) > 0) {
             _ = win.TranslateMessage(&msg);
             _ = win.DispatchMessageW(&msg);
         }
-        if (event_n != 0) {
-            event_n -= 1;
-            return event_queue[event_n];
+        if (events.pull()) |event| {
+            return event;
         } else {
             return .{ .nop = {} };
         }
@@ -147,12 +145,13 @@ pub const Window = struct {
         //_ = win.InvalidateRect(self.handle, null, false);
         //_ = win.UpdateWindow(self.handle);
         const window_id = @intFromPtr(self.handle);
-        event_queue[event_n] = .{
-            .draw = .{
-                .window_id = window_id,
+        events.push(
+            .{
+                .draw = .{
+                    .window_id = window_id,
+                },
             },
-        };
-        event_n += 1;
+        );
     }
 
     pub fn beginDraw(self: *@This()) !void {
@@ -253,8 +252,7 @@ pub const Image = struct {
 
 var class_count: usize = 0;
 
-var event_n: u8 = 0;
-var event_queue: [256]common.Event = undefined;
+var events = queue.Queue(common.Event).init();
 
 pub fn windowProc(
     window_handle: win.WindowHandle,
@@ -262,26 +260,24 @@ pub fn windowProc(
     wparam: usize,
     lparam: isize,
 ) callconv(.winapi) isize {
-    defer event_n += 1;
-
     const window_id = @intFromPtr(window_handle);
     switch (message_type) {
         .WM_DESTROY => {
-            event_queue[event_n] = .{ .close = window_id };
+            events.push(.{ .close = window_id });
         },
         .WM_ERASEBKGND => {
-            event_queue[event_n] = .{ .nop = {} };
+            events.push(.{ .nop = {} });
         },
         .WM_PAINT => {
             var rect: win.Rect = std.mem.zeroes(win.Rect);
             _ = win.GetUpdateRect(window_handle, &rect, false);
 
-            event_queue[event_n] = .{
+            events.push(.{
                 .draw = .{
                     .window_id = window_id,
                     .area = .{},
                 },
-            };
+            });
 
             var paint = std.mem.zeroes(win.Paint);
             const hdc = win.BeginPaint(window_handle, &paint);
@@ -298,112 +294,112 @@ pub fn windowProc(
             const x = win.loword(lparam);
             const y = win.hiword(lparam);
 
-            event_queue[event_n] = .{
+            events.push(.{
                 .mouse_pressed = .{
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 1,
                     .window_id = window_id,
                 },
-            };
+            });
         },
         .WM_LBUTTONUP => {
             const x = win.loword(lparam);
             const y = win.hiword(lparam);
 
-            event_queue[event_n] = .{
+            events.push(.{
                 .mouse_released = .{
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 1,
                     .window_id = window_id,
                 },
-            };
+            });
         },
         .WM_MBUTTONDOWN => {
             const x = win.loword(lparam);
             const y = win.hiword(lparam);
 
-            event_queue[event_n] = .{
+            events.push(.{
                 .mouse_pressed = .{
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 2,
                     .window_id = window_id,
                 },
-            };
+            });
         },
         .WM_MBUTTONUP => {
             const x = win.loword(lparam);
             const y = win.hiword(lparam);
-            event_queue[event_n] = .{
+            events.push(.{
                 .mouse_released = .{
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 2,
                     .window_id = window_id,
                 },
-            };
+            });
         },
         .WM_RBUTTONDOWN => {
             const x = win.loword(lparam);
             const y = win.hiword(lparam);
 
-            event_queue[event_n] = .{
+            events.push(.{
                 .mouse_pressed = .{
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 3,
                     .window_id = window_id,
                 },
-            };
+            });
         },
         .WM_RBUTTONUP => {
             const x = win.loword(lparam);
             const y = win.hiword(lparam);
 
-            event_queue[event_n] = .{
+            events.push(.{
                 .mouse_released = .{
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .button = 3,
                     .window_id = window_id,
                 },
-            };
+            });
         },
         .WM_MOUSEMOVE => {
             const x = win.loword(lparam);
             const y = win.hiword(lparam);
 
-            event_queue[event_n] = .{
+            events.push(.{
                 .mouse_moved = .{
                     .x = @intCast(x),
                     .y = @intCast(y),
                     .window_id = window_id,
                 },
-            };
+            });
         },
         .WM_KEYDOWN => {
             //const key: win.VirtualKeys = @enumFromInt(wparam);
             //event[event_n].key_pressed.key = @enumFr;
 
-            event_queue[event_n] = .{
+            events.push(.{
                 .key_pressed = .{
                     .key = 0,
                     .window_id = window_id,
                 },
-            };
+            });
         },
         .WM_KEYUP => {
-            event_queue[event_n] = .{
+            events.push(.{
                 .key_released = .{
                     .key = 0,
                     .window_id = window_id,
                 },
-            };
+            });
         },
         else => {
-            event_queue[event_n] = .{ .nop = {} };
+            events.push(.{ .nop = {} });
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
         },
     }
@@ -419,5 +415,6 @@ fn commonPixelToWinPixel(src: [3]u8) u32 {
 const std = @import("std");
 const win = @import("windows");
 const common = @import("common.zig");
+const queue = @import("queue.zig");
 
 const log = std.log.scoped(.any_win32);
