@@ -11,13 +11,13 @@ pub fn Queue(Type: type) type {
 
         pub fn push(self: *@This(), item: Type) void {
             self.data[self.tail] = item;
-            self.tail += 1;
+            self.tail = self.tail +% 1;
         }
 
         pub fn pull(self: *@This()) ?Type {
             if (self.data[self.head]) |item| {
                 self.data[self.head] = null;
-                self.head += 1;
+                self.head = self.head +% 1;
                 return item;
             }
             return null;
