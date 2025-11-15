@@ -9,6 +9,8 @@ pub const WindowManager = struct {
     net_writer_buffer: []u8,
     net_writer: *std.net.Stream.Writer,
 
+    redraw_requested: bool = false,
+
     pub fn init(allocator: std.mem.Allocator) !@This() {
         const conn = try x11.connect(.{});
         const info = try x11.setup(allocator, conn);
@@ -50,6 +52,20 @@ pub const WindowManager = struct {
     }
 
     pub fn receive(self: *@This()) !common.Event {
+        if (self.redraw_requested) {
+            self.redraw_requested = false;
+            return .{
+                .draw = .{
+                    .window_id = 0,
+                    .area = common.BBox{
+                        .x = 0,
+                        .y = 0,
+                        .width = 0,
+                        .height = 0,
+                    },
+                },
+            };
+        }
         if (try x11.receive(self.conn)) |message| {
             switch (message) {
                 .Expose => |expose| {
@@ -276,8 +292,11 @@ pub const Window = struct {
             .width = area.width,
             .exposures = true,
         };
-        try x11.send(self.wm.conn, clear_area);
-        self.redrawn = true;
+        _ = clear_area;
+        // sending fake redraw event;
+        //try x11.send(self.wm.conn, clear_area);
+        //self.redrawn = true;
+        self.wm.redraw_requested = true;
     }
 
     pub fn beginDraw(_: *@This()) !void {}

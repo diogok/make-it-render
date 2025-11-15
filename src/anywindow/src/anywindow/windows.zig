@@ -136,6 +136,8 @@ pub const Window = struct {
         if (self.display) |_| {
             var rect = win.Rect{};
             _ = win.GetWindowRect(self.handle, &rect);
+            rect.top = -1;
+            rect.left = -1;
             _ = win.FillRect(self.display, &rect, self.background);
         }
     }
