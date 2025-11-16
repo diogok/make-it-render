@@ -7,10 +7,10 @@ It is an experimental project with constant changes.
 ## What is this
 
 - Glue code and abstraction between X11, Windows and MacOS(soon?) window and input handling
-- Support window management, input events and renderring
+- Support window management, input events and rendering
 - It only uses C when linking to win32 required libraries
 - Produces small binaries, relatively fast
-- Render text to pixels
+- Render text
 - No dependencies
 
 ## What this is not
@@ -36,12 +36,12 @@ Each module is independent, should be usable, and them there some "glue" modules
 
 Notably missing:
 
-- Fix differences between mouse position and keys between windows and linux
+- Fix differences in mouse position and keys between windows and linux
 - Fullscreen windows and back
-- Image drawing, like from PNGs
-- Wayland support, works under X11 and XWayland
-- MacOS support, I don't own a Mac
-- Consider desktop scaling
+- Image drawing, like from PNGs or other image formats
+- Wayland support
+- MacOS support
+- Respect desktop scaling
 
 ## Usage
 
