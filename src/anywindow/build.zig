@@ -23,7 +23,6 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .strip = optimize == .ReleaseSmall,
-            .link_libc = optimize == .Debug,
         },
     );
     any.addImport("x11", x11);
@@ -35,7 +34,6 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .strip = optimize == .ReleaseSmall,
-            .link_libc = optimize == .Debug,
         });
         demo_mod.addImport("anywindow", any);
         const demo = b.addExecutable(.{

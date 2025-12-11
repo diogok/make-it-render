@@ -11,9 +11,14 @@ pub const WindowManager = struct {
 
     events: queue.Queue(common.Event),
 
+    scaling: f32,
+
     pub fn init(allocator: std.mem.Allocator) !@This() {
         const conn = try x11.connect(.{});
+
         const info = try x11.setup(allocator, conn);
+        errdefer info.deinit();
+
         const xid = x11.XID.init(info.resource_id_base, info.resource_id_mask);
 
         const atoms = Atoms{
@@ -25,8 +30,12 @@ pub const WindowManager = struct {
         };
 
         const net_writer_buffer: []u8 = try allocator.alloc(u8, 4 * 1024);
+        errdefer allocator.free(net_writer_buffer);
         const net_writer = try allocator.create(std.net.Stream.Writer);
+        errdefer allocator.destroy(net_writer);
         net_writer.* = conn.writer(net_writer_buffer);
+
+        const scaling = getDesktopScaling(allocator) catch 1.0;
 
         return @This(){
             .allocator = allocator,
@@ -37,6 +46,8 @@ pub const WindowManager = struct {
 
             .net_writer_buffer = net_writer_buffer,
             .net_writer = net_writer,
+
+            .scaling = scaling,
 
             .events = .init(),
         };
@@ -128,6 +139,7 @@ pub const WindowManager = struct {
                         },
                     };
                 },
+                // TODO: resize, get size and dpy?
                 else => {
                     return .{ .nop = {} };
                 },
@@ -153,6 +165,8 @@ pub const WindowManager = struct {
 pub const Window = struct {
     window_id: u32,
     wm: *WindowManager,
+
+    scaling: f32,
 
     status: common.WindowStatus,
 
@@ -237,6 +251,8 @@ pub const Window = struct {
             .root = wm.info.screens[0].root,
             .depth = wm.info.screens[0].root_depth,
             .graphic_context_id = graphic_context_id,
+
+            .scaling = wm.scaling,
         };
     }
 
@@ -386,6 +402,46 @@ fn commonPixelToX11Pixel(src: [3]u8) u32 {
     return std.mem.bytesToValue(u32, &dst);
 }
 
+fn getDesktopScaling(allocator: std.mem.Allocator) !f32 {
+    var scaling: f32 = 1.0;
+
+    const conn = try x11.connect(.{});
+
+    const info = try x11.setup(allocator, conn);
+    defer info.deinit();
+
+    const string = try x11.internAtom(conn, "STRING");
+
+    const resource_manager = try x11.internAtom(conn, "RESOURCE_MANAGER");
+    try x11.send(conn, x11.proto.GetProperty{
+        .window_id = info.screens[0].root,
+        .property = resource_manager,
+        .property_type = string,
+        .long_length = 1024,
+    });
+    const resource_reply = try x11.receiveReply(conn, x11.proto.GetPropertyReply);
+
+    var buffer: [256]u8 = undefined;
+    if (resource_reply) |r| {
+        const tmp = buffer[0..r.value_len];
+        _ = try conn.read(tmp);
+
+        var reader = std.Io.Reader.fixed(tmp);
+        while (try reader.takeDelimiter('\n')) |line| {
+            if (std.mem.startsWith(u8, line, "Xft.dpi:")) {
+                var split = std.mem.splitScalar(u8, line, ':');
+                _ = split.first();
+                if (split.next()) |value| {
+                    const trimmed = std.mem.trim(u8, value, " \t");
+                    scaling = try std.fmt.parseFloat(f32, trimmed);
+                    break;
+                }
+            }
+        }
+    }
+
+    return scaling / 96;
+}
 const Atoms = struct {
     atom: u32,
     string: u32,

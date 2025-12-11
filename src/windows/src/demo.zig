@@ -14,6 +14,11 @@ pub fn main() !void {
 
     // Get our own program instance handle.
     const instance = win.GetModuleHandleW(null);
+    if (instance == null) {
+        const e = win.GetLastError();
+        log.err("Error getting instance {d}", .{e});
+        return error.InitError;
+    }
 
     // Convert our string to one Windows can use.
     const class_name = try win.W(allocator, "HelloClass"); // for runtime known strings
@@ -132,7 +137,7 @@ pub fn windowProc(
             // select this bitmap on our frame_handle
             _ = win.SelectObject(frame_handle, bitmap);
         },
-        .WM_DESTROY => {
+        .WM_CLOSE => {
             win.PostQuitMessage(0);
         },
         .WM_PAINT => {

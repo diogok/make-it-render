@@ -16,6 +16,17 @@ pub extern "kernel32" fn GetModuleHandleW(moduleName: ?String) callconv(.winapi)
 /// Return the last error number, check on MS documentation what the code means.
 pub extern "kernel32" fn GetLastError() callconv(.winapi) u32;
 
+pub const HResult = enum(c_int) {
+    ok = 0,
+    _,
+};
+
+pub const Bool = enum(c_int) {
+    not_ok = 0,
+    ok = 1,
+    _,
+};
+
 pub fn loword(lParam: isize) u16 {
     const value: usize = @bitCast(lParam);
     return @intCast(0xffff & value);
@@ -205,6 +216,7 @@ pub const MessageType = enum(u32) {
     WM_CREATE = 0x0001,
     WM_DESTROY = 0x0002,
     WM_SIZE = 0x0005,
+    WM_CLOSE = 0x0010,
     WM_PAINT = 0x000F, //15,
     WM_KEYDOWN = 0x0100,
     WM_KEYUP = 0x0101,
@@ -228,6 +240,7 @@ pub const MessageType = enum(u32) {
     WM_XBUTTONDBLCLK = 0x02D,
     WM_MOUSEHWHEEL = 0x020E,
     WM_ERASEBKGND = 0x0014,
+    WM_DPICHANGED = 0x02E0,
     _,
 };
 
@@ -375,8 +388,16 @@ pub extern "user32" fn GetWindowRect(
     rect: ?*Rect,
 ) callconv(.winapi) i32;
 
+pub extern "user32" fn GetDpiForWindow(
+    hwnd: ?*anyopaque,
+) callconv(.winapi) u32;
+
+pub extern "user32" fn SetProcessDPIAware() callconv(.winapi) Bool;
+pub extern "user32" fn GetDpiForSystem() callconv(.winapi) u32;
+
 pub const DeviceContext = *anyopaque;
 pub const Bitmap = *anyopaque;
+pub const Monitor = *anyopaque;
 
 pub const Paint = extern struct {
     device_context: usize,
@@ -388,10 +409,10 @@ pub const Paint = extern struct {
 };
 
 pub const Rect = extern struct {
-    left: c_long = 0,
-    top: c_long = 0,
-    right: c_long = 0,
-    bottom: c_long = 0,
+    left: i32 = 0,
+    top: i32 = 0,
+    right: i32 = 0,
+    bottom: i32 = 0,
 };
 
 pub const BitmapInfo = extern struct {

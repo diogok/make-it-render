@@ -36,12 +36,13 @@ Each module is independent, should be usable, and them there some "glue" modules
 
 Notably missing:
 
-- Fix differences in mouse position and keys between windows and linux
+- Improve keyboard handling
 - Fullscreen windows and back
+- Icons
 - Image drawing, like from PNGs or other image formats
 - Wayland support
 - MacOS support
-- Respect desktop scaling
+- Check changes in DPI
 
 ## Usage
 

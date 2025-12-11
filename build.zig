@@ -26,7 +26,6 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .strip = optimize == .ReleaseSmall,
-            .link_libc = optimize == .Debug,
         });
         demo_mod.addImport("make_it_render", make_it_render);
 

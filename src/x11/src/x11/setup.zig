@@ -171,6 +171,11 @@ pub const Screen = struct {
     root_depth: u8,
     allowed_depths: []const Depth = &[_]Depth{},
 
+    width_in_pixels: u16,
+    height_in_pixels: u16,
+    width_in_millimeters: u16,
+    height_in_millimeters: u16,
+
     pub fn initFromProto(screen: proto.Screen) @This() {
         return .{
             .root = screen.root,
@@ -179,6 +184,10 @@ pub const Screen = struct {
             .black_pixel = screen.black_pixel,
             .root_visual = screen.root_visual,
             .root_depth = screen.root_depth,
+            .width_in_pixels = screen.width_in_pixels,
+            .height_in_pixels = screen.height_in_pixels,
+            .width_in_millimeters = screen.width_in_millimeters,
+            .height_in_millimeters = screen.height_in_millimeters,
         };
     }
 

@@ -35,7 +35,7 @@ pub fn main() !void {
         defer pixel_reader.deinit();
 
         // create the image for each
-        var img = try canvas.createImage(
+        var img = try canvas.createImageScaled(
             .{
                 .height = text.height,
                 .width = text.width,
@@ -43,7 +43,7 @@ pub fn main() !void {
                 .y = 100 + (@as(u8, @truncate(i)) * 20),
             },
         );
-        try img.image.setPixels(&pixel_reader.interface);
+        try img.setPixels(&pixel_reader.interface);
         try wm.flush();
     }
 
@@ -51,7 +51,7 @@ pub fn main() !void {
     var mouse_pos_bitmap = try textz.render(allocator, fonts, "00000x00000");
     defer mouse_pos_bitmap.deinit();
 
-    var mouse_pos_img = try canvas.createImage(
+    var mouse_pos_img = try canvas.createImageScaled(
         .{
             .x = 0,
             .y = 0,
@@ -96,11 +96,11 @@ pub fn main() !void {
                 var pixel_reader2 = try mouse_pos_bitmap2.pixelReader(&[_]u8{ 255, 150, 0, 1 });
                 defer pixel_reader2.deinit();
 
-                try mouse_pos_img.image.setPixels(&pixel_reader2.interface);
+                try mouse_pos_img.setPixels(&pixel_reader2.interface);
                 try wm.flush();
 
-                mouse_pos_img.bbox.x = move.x;
-                mouse_pos_img.bbox.y = move.y;
+                mouse_pos_img.dst_bbox.x = move.x;
+                mouse_pos_img.dst_bbox.y = move.y;
 
                 // ask to redraw everything
                 try window.redraw(.{});

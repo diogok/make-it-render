@@ -801,7 +801,7 @@ pub const GetProperty = extern struct {
     opcode: u8 = 20,
     delete: bool = false,
     length: u16 = (@sizeOf(@This()) / 4),
-    window_id: u32,
+    window_id: u32 = 0,
     property: u32,
     property_type: u32 = 0,
     long_offset: u32 = 0,
@@ -810,7 +810,7 @@ pub const GetProperty = extern struct {
 
 pub const GetPropertyReply = extern struct {
     code: u8 = 1,
-    fomat: u8,
+    format: u8,
     sequence_number: u16,
     reply_length: u32,
     property_type: u32,

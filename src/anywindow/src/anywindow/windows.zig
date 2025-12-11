@@ -5,6 +5,12 @@ pub const WindowManager = struct {
 
     pub fn init(allocator: std.mem.Allocator) !@This() {
         const instance = win.GetModuleHandleW(null);
+        if (instance == null) {
+            const e = win.GetLastError();
+            log.err("Error getting instance {d}", .{e});
+            return error.InitError;
+        }
+        _ = win.SetProcessDPIAware();
 
         return @This(){
             .allocator = allocator,
@@ -54,6 +60,8 @@ pub const Window = struct {
     display: ?win.DeviceContext = null,
     background: ?win.BrushHandler = null,
 
+    scaling: f32 = 1.0,
+
     pub fn init(wm: *WindowManager, options: common.WindowOptions) !@This() {
         const class_name_n = try std.fmt.allocPrint(wm.allocator, "WindowClass_{d}", .{class_count});
         defer wm.allocator.free(class_name_n);
@@ -100,6 +108,9 @@ pub const Window = struct {
             return error.CreateWindowError;
         }
 
+        const dpi = win.GetDpiForWindow(handle);
+        const scaling: f32 = @as(f32, @floatFromInt(dpi)) / 96.0;
+
         return @This(){
             .wm = wm,
             .handle = handle,
@@ -108,6 +119,7 @@ pub const Window = struct {
             .title = title,
             .class_name = class_name,
             .background = background,
+            .scaling = scaling,
         };
     }
 
@@ -155,7 +167,7 @@ pub const Window = struct {
     }
 
     pub fn beginDraw(self: *@This()) !void {
-        self.display = win.GetWindowDC(self.handle);
+        self.display = win.GetDC(self.handle);
     }
 
     pub fn endDraw(self: *@This()) !void {
@@ -262,7 +274,7 @@ pub fn windowProc(
 ) callconv(.winapi) isize {
     const window_id = @intFromPtr(window_handle);
     switch (message_type) {
-        .WM_DESTROY => {
+        .WM_CLOSE => {
             events.push(.{ .close = window_id });
         },
         .WM_ERASEBKGND => {
@@ -398,6 +410,15 @@ pub fn windowProc(
                 },
             });
         },
+        .WM_CREATE => {
+            events.push(.{ .nop = {} });
+            return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
+        },
+        .WM_DPICHANGED => {
+            events.push(.{ .nop = {} });
+            return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
+        },
+        // TODO: Resize
         else => {
             events.push(.{ .nop = {} });
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
