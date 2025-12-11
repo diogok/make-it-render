@@ -65,5 +65,4 @@ pub const Canvas = struct {
 const std = @import("std");
 
 const anywin = @import("anywindow");
-const textz = @import("textz");
-const canvas = @import("canvas");
+const textz = @import("text");

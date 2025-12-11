@@ -27,7 +27,7 @@ Each module is independent, should be usable, and them there some "glue" modules
 	- macos
 	- x11
 	- windows
-- textz: Read fonts, get glyphs, work with unicode
+- text: Read fonts, get glyphs, work with unicode
 	- fonts: embed unifont and terminus
 	- bdf: BDF parsing
 - glue.zig: Joins everything

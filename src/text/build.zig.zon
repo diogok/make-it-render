@@ -1,12 +1,11 @@
 .{
-    .name = .canvas,
+    .name = .text,
+    .fingerprint = 0x3b8ba7c738390150,
     .version = "0.0.0",
-    .fingerprint = 0xa59f6c185c000c33,
-    .minimum_zig_version = "0.15.2",
     .dependencies = .{
     },
     .paths = .{
-        "build.zig",
+        "buid.zig",
         "build.zig.zon",
         "src",
     },

@@ -3,10 +3,10 @@
 /// Create and manage windows
 pub const anywindow = @import("anywindow");
 /// Render text into the windows
-pub const textz = @import("textz");
-/// Canvas to draw pixels to
-pub const canvas = @import("canvas");
-
+pub const text = @import("text");
+/// Code make things easier
 pub const glue = @import("glue.zig");
 
-test {}
+test {
+    _ = @import("glue.zig");
+}

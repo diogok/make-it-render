@@ -146,7 +146,7 @@ const std = @import("std");
 const make_it_render = @import("make_it_render");
 
 const anywin = make_it_render.anywindow;
-const textz = make_it_render.textz;
+const textz = make_it_render.text;
 //const canvas = make_it_render.canvas;
 
 const log = std.log.scoped(.demo);

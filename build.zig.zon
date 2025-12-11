@@ -6,8 +6,8 @@
         .anywindow = .{
             .path = "src/anywindow",
         },
-        .textz = .{
-            .path = "src/textz",
+        .text = .{
+            .path = "src/text",
         },
         .canvas = .{
             .path = "src/canvas",

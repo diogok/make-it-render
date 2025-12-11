@@ -17,11 +17,8 @@ pub fn build(b: *std.Build) void {
     const anywindow = b.dependency("anywindow", .{ .target = target, .optimize = optimize });
     make_it_render.addImport("anywindow", anywindow.module("anywindow"));
 
-    const textz = b.dependency("textz", .{ .target = target, .optimize = optimize });
-    make_it_render.addImport("textz", textz.module("textz"));
-
-    const canvas = b.dependency("canvas", .{ .target = target, .optimize = optimize });
-    make_it_render.addImport("canvas", canvas.module("canvas"));
+    const text = b.dependency("text", .{ .target = target, .optimize = optimize });
+    make_it_render.addImport("text", text.module("text"));
 
     {
         const demo_mod = b.addModule("demo", .{
