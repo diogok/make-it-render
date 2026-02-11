@@ -48,6 +48,8 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/root.zig"),
         });
         tests_mod.addImport("make_it_render", make_it_render);
+        tests_mod.addImport("anywindow", anywindow.module("anywindow"));
+        tests_mod.addImport("text", text.module("text"));
 
         const tests = b.addTest(.{
             .root_module = tests_mod,

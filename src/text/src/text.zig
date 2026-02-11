@@ -16,6 +16,7 @@ pub fn render(
     iter.i = 0;
 
     const bitmap = try allocator.alloc(u1, width * height);
+    @memset(bitmap, 0);
 
     // now "render" to the bitmap
     var global_x: u16 = 0;
@@ -49,7 +50,7 @@ test "Render a short phrase" {
     defer uni.deinit();
 
     const text = "I, am!";
-    const result = try render(testing.allocator, &[_]common.Font{uni}, text);
+    var result = try render(testing.allocator, &[_]common.Font{uni}, text);
     defer result.deinit();
 
     try testing.expectEqual(48, result.width);

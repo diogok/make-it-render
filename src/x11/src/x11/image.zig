@@ -155,3 +155,130 @@ const xsetup = @import("setup.zig");
 const proto = @import("proto.zig");
 
 const log = std.log.scoped(.x11);
+
+test "rgbaToZPixmap swaps R and B channels" {
+    const testing = std.testing;
+
+    // RGBA pixels: Red, Green, Blue, White
+    var pixels = [_]u8{
+        255, 0,   0,   255, // Red (R=255, G=0, B=0, A=255)
+        0,   255, 0,   255, // Green (R=0, G=255, B=0, A=255)
+        0,   0,   255, 255, // Blue (R=0, G=0, B=255, A=255)
+        255, 255, 255, 255, // White (R=255, G=255, B=255, A=255)
+    };
+
+    rgbaToZPixmap(&pixels);
+
+    // Expected: BGRA format with alpha zeroed
+    const expected = [_]u8{
+        0,   0,   255, 0, // Red becomes (B=0, G=0, R=255, A=0)
+        0,   255, 0,   0, // Green stays (B=0, G=255, R=0, A=0)
+        255, 0,   0,   0, // Blue becomes (B=255, G=0, R=0, A=0)
+        255, 255, 255, 0, // White (B=255, G=255, R=255, A=0)
+    };
+
+    try testing.expectEqualSlices(u8, &expected, &pixels);
+}
+
+test "rgbaToZPixmap handles single pixel" {
+    const testing = std.testing;
+
+    var pixels = [_]u8{ 100, 150, 200, 50 };
+    rgbaToZPixmap(&pixels);
+
+    // R and B swapped, alpha zeroed
+    try testing.expectEqualSlices(u8, &[_]u8{ 200, 150, 100, 0 }, &pixels);
+}
+
+test "rgbaToZPixmap handles empty slice" {
+    const testing = std.testing;
+
+    var pixels = [_]u8{};
+    rgbaToZPixmap(&pixels);
+
+    try testing.expectEqual(@as(usize, 0), pixels.len);
+}
+
+test "rgbaToZPixmapAlloc creates new allocation" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    const info = ImageInfo{
+        .visual_type = .{
+            .visual_id = 0,
+            .class = .TrueColor,
+            .bits_per_rgb_value = 8,
+            .colormap_entries = 256,
+            .red_mask = 0xff0000,
+            .green_mask = 0x00ff00,
+            .blue_mask = 0x0000ff,
+            .pad = [_]u8{0} ** 4,
+        },
+        .format = .{
+            .depth = 24,
+            .bits_per_pixel = 32,
+            .scanline_pad = 32,
+            .pad = [_]u8{0} ** 5,
+        },
+    };
+
+    const rgba = [_]u8{ 255, 0, 0, 255, 0, 255, 0, 255 };
+    const result = try rgbaToZPixmapAlloc(allocator, info, &rgba);
+    defer allocator.free(result);
+
+    // Verify conversion happened
+    const expected = [_]u8{ 0, 0, 255, 0, 0, 255, 0, 0 };
+    try testing.expectEqualSlices(u8, &expected, result);
+}
+
+test "rgbaToZPixmapInPlace rejects non-TrueColor" {
+    const testing = std.testing;
+
+    const info = ImageInfo{
+        .visual_type = .{
+            .visual_id = 0,
+            .class = .StaticGray,
+            .bits_per_rgb_value = 8,
+            .colormap_entries = 256,
+            .red_mask = 0,
+            .green_mask = 0,
+            .blue_mask = 0,
+            .pad = [_]u8{0} ** 4,
+        },
+        .format = .{
+            .depth = 24,
+            .bits_per_pixel = 32,
+            .scanline_pad = 32,
+            .pad = [_]u8{0} ** 5,
+        },
+    };
+
+    var pixels = [_]u8{ 255, 0, 0, 255 };
+    try testing.expectError(error.UnsupportedVisualTypeClass, rgbaToZPixmapInPlace(info, &pixels));
+}
+
+test "rgbaToZPixmapInPlace rejects non-32bpp" {
+    const testing = std.testing;
+
+    const info = ImageInfo{
+        .visual_type = .{
+            .visual_id = 0,
+            .class = .TrueColor,
+            .bits_per_rgb_value = 8,
+            .colormap_entries = 256,
+            .red_mask = 0xff0000,
+            .green_mask = 0x00ff00,
+            .blue_mask = 0x0000ff,
+            .pad = [_]u8{0} ** 4,
+        },
+        .format = .{
+            .depth = 16,
+            .bits_per_pixel = 16,
+            .scanline_pad = 16,
+            .pad = [_]u8{0} ** 5,
+        },
+    };
+
+    var pixels = [_]u8{ 255, 0, 0, 255 };
+    try testing.expectError(error.UnsupportedBitsPerPixel, rgbaToZPixmapInPlace(info, &pixels));
+}

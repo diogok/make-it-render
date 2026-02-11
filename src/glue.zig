@@ -195,3 +195,130 @@ const std = @import("std");
 
 const anywin = @import("anywindow");
 const textz = @import("text");
+
+test "nearestNeighbor 2x upscale" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    // 2x2 source image: red, green, blue, white
+    const src = [_]u8{
+        255, 0,   0,   255, // red
+        0,   255, 0,   255, // green
+        0,   0,   255, 255, // blue
+        255, 255, 255, 255, // white
+    };
+
+    var src_reader = std.Io.Reader.fixed(&src);
+    var allocating = std.Io.Writer.Allocating.init(allocator);
+    defer allocating.deinit();
+    const dst_writer = &allocating.writer;
+
+    // Scale 2x2 -> 4x4
+    try nearestNeighbor(2, 2, 4, 4, &src_reader, dst_writer, allocator);
+
+    const result = allocating.written();
+    // 4x4 = 16 pixels * 4 bytes = 64 bytes
+    try testing.expectEqual(@as(usize, 64), result.len);
+
+    // Top-left quadrant should be red (first pixel repeated)
+    try testing.expectEqualSlices(u8, &[_]u8{ 255, 0, 0, 255 }, result[0..4]); // (0,0)
+    try testing.expectEqualSlices(u8, &[_]u8{ 255, 0, 0, 255 }, result[4..8]); // (1,0)
+    try testing.expectEqualSlices(u8, &[_]u8{ 255, 0, 0, 255 }, result[16..20]); // (0,1)
+}
+
+test "nearestNeighbor identity (no scaling)" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    // 2x2 source
+    const src = [_]u8{
+        1, 2, 3, 4,
+        5, 6, 7, 8,
+        9, 10, 11, 12,
+        13, 14, 15, 16,
+    };
+
+    var src_reader = std.Io.Reader.fixed(&src);
+    var allocating = std.Io.Writer.Allocating.init(allocator);
+    defer allocating.deinit();
+    const dst_writer = &allocating.writer;
+
+    // Same size: 2x2 -> 2x2
+    try nearestNeighbor(2, 2, 2, 2, &src_reader, dst_writer, allocator);
+
+    const result = allocating.written();
+    try testing.expectEqualSlices(u8, &src, result);
+}
+
+test "nearestNeighbor 2x downscale" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    // 4x4 source image
+    const src = [_]u8{
+        // Row 0
+        255, 0,   0,   255, // red
+        255, 0,   0,   255, // red
+        0,   255, 0,   255, // green
+        0,   255, 0,   255, // green
+        // Row 1
+        255, 0,   0,   255, // red
+        255, 0,   0,   255, // red
+        0,   255, 0,   255, // green
+        0,   255, 0,   255, // green
+        // Row 2
+        0,   0,   255, 255, // blue
+        0,   0,   255, 255, // blue
+        255, 255, 255, 255, // white
+        255, 255, 255, 255, // white
+        // Row 3
+        0,   0,   255, 255, // blue
+        0,   0,   255, 255, // blue
+        255, 255, 255, 255, // white
+        255, 255, 255, 255, // white
+    };
+
+    var src_reader = std.Io.Reader.fixed(&src);
+    var allocating = std.Io.Writer.Allocating.init(allocator);
+    defer allocating.deinit();
+    const dst_writer = &allocating.writer;
+
+    // Scale 4x4 -> 2x2
+    try nearestNeighbor(4, 4, 2, 2, &src_reader, dst_writer, allocator);
+
+    const result = allocating.written();
+    // 2x2 = 4 pixels * 4 bytes = 16 bytes
+    try testing.expectEqual(@as(usize, 16), result.len);
+
+    // Should sample corners: red, green, blue, white
+    try testing.expectEqualSlices(u8, &[_]u8{ 255, 0, 0, 255 }, result[0..4]); // red
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 255, 0, 255 }, result[4..8]); // green
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 255, 255 }, result[8..12]); // blue
+    try testing.expectEqualSlices(u8, &[_]u8{ 255, 255, 255, 255 }, result[12..16]); // white
+}
+
+test "nearestNeighbor single pixel upscale" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    // 1x1 source
+    const src = [_]u8{ 128, 64, 32, 255 };
+
+    var src_reader = std.Io.Reader.fixed(&src);
+    var allocating = std.Io.Writer.Allocating.init(allocator);
+    defer allocating.deinit();
+    const dst_writer = &allocating.writer;
+
+    // Scale 1x1 -> 3x3
+    try nearestNeighbor(1, 1, 3, 3, &src_reader, dst_writer, allocator);
+
+    const result = allocating.written();
+    // 3x3 = 9 pixels * 4 bytes = 36 bytes
+    try testing.expectEqual(@as(usize, 36), result.len);
+
+    // All pixels should be the same color
+    var i: usize = 0;
+    while (i < 9) : (i += 1) {
+        try testing.expectEqualSlices(u8, &src, result[i * 4 .. i * 4 + 4]);
+    }
+}

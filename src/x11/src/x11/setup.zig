@@ -68,40 +68,58 @@ fn readSetupReply(allocator: std.mem.Allocator, reader: *std.Io.Reader) !Setup {
     const base_reply = try reply_reader.readStruct(proto.SetupContent);
     log.debug("Base setup: {any}", .{base_reply});
 
-    // TODO: missing errdefer to de-allocate
-    // TODO: maybe split functions to read each part
-
     const vendor = try allocator.alloc(u8, base_reply.vendor_len);
     defer allocator.free(vendor);
     _ = try reply_reader.read(vendor);
     _ = try reply_reader.skipBytes(vendor.len % 4, .{}); // pad vendor
 
     const formats = try allocator.alloc(proto.Format, base_reply.pixmap_formats_len);
+    errdefer allocator.free(formats);
     for (formats, 0..) |_, format_index| {
         formats[format_index] = try reply_reader.readStruct(proto.Format);
         log.debug("Format: {any}", .{formats[format_index]});
     }
 
     const screens = try allocator.alloc(Screen, base_reply.roots_len);
+    var screens_initialized: usize = 0;
+    errdefer {
+        for (screens[0..screens_initialized]) |screen| {
+            screen.deinit(allocator);
+        }
+        allocator.free(screens);
+    }
+
     for (screens, 0..) |_, screen_index| {
         const screen = try reply_reader.readStruct(proto.Screen);
         screens[screen_index] = Screen.initFromProto(screen);
         log.debug("Screen: {any}", .{screens[screen_index]});
 
         const allowed_depths = try allocator.alloc(Depth, screen.allowed_depths_len);
+        var depths_initialized: usize = 0;
+        errdefer {
+            for (allowed_depths[0..depths_initialized]) |depth| {
+                depth.deinit(allocator);
+            }
+            allocator.free(allowed_depths);
+        }
+
         for (allowed_depths, 0..) |_, depth_index| {
             const depth = try reply_reader.readStruct(proto.Depth);
             allowed_depths[depth_index] = Depth.initFromProto(depth);
             log.debug("Allowed depths: {any}", .{allowed_depths[depth_index]});
 
             const visual_types = try allocator.alloc(proto.VisualType, depth.visual_type_len);
+            errdefer allocator.free(visual_types);
+
             for (visual_types, 0..) |_, visual_type_index| {
                 visual_types[visual_type_index] = try reply_reader.readStruct(proto.VisualType);
                 log.debug("Visual type: {any}", .{visual_types[visual_type_index]});
             }
             allowed_depths[depth_index].visual_types = visual_types;
+            depths_initialized += 1;
         }
         screens[screen_index].allowed_depths = allowed_depths;
+        screens_initialized += 1;
     }
 
     var result = Setup.initFromProto(allocator, base_reply);

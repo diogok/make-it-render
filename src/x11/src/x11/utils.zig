@@ -18,7 +18,25 @@ pub fn mask(values: anytype) u32 {
     return value_mask;
 }
 
-test "mask" {}
+test "mask combines enum values with OR" {
+    // Combine KeyPress and ButtonPress event masks
+    const result = mask(&[_]proto.EventMask{
+        .KeyPress,
+        .ButtonPress,
+    });
+    const expected: u32 = 0b1 | 0b100; // KeyPress | ButtonPress
+    try testing.expectEqual(expected, result);
+}
+
+test "mask with single value" {
+    const result = mask(&[_]proto.EventMask{.Exposure});
+    try testing.expectEqual(@as(u32, 0b1000000000000000), result);
+}
+
+test "mask with empty array" {
+    const result = mask(&[_]proto.EventMask{});
+    try testing.expectEqual(@as(u32, 0), result);
+}
 
 /// Build a mask as expected from, example, CreateWindow.eventMask.
 /// Based of values you will pass.
@@ -145,4 +163,77 @@ pub fn readReply(reader: *std.Io.Reader, ReplyType: type) !?ReplyType {
     const message = try message_reader.readStruct(ReplyType);
 
     return message;
+}
+
+test "clientMessageData format 8 returns u8 array" {
+    const msg = proto.ClientMessage{
+        .format = 8,
+        .sequence_number = 0,
+        .window_id = 0,
+        .data_Type = 0,
+        .data = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 },
+    };
+
+    const result = clientMessageData(msg);
+    try testing.expectEqual(ClientMessageData{ .u8 = msg.data }, result);
+}
+
+test "clientMessageData format 16 returns u16 array" {
+    // Data bytes: little-endian pairs become u16 values
+    const msg = proto.ClientMessage{
+        .format = 16,
+        .sequence_number = 0,
+        .window_id = 0,
+        .data_Type = 0,
+        .data = [_]u8{
+            0x01, 0x00, // 1
+            0x02, 0x00, // 2
+            0x03, 0x00, // 3
+            0x04, 0x00, // 4
+            0x05, 0x00, // 5
+            0x06, 0x00, // 6
+            0x07, 0x00, // 7
+            0x08, 0x00, // 8
+            0x09, 0x00, // 9
+            0x0A, 0x00, // 10
+        },
+    };
+
+    const result = clientMessageData(msg);
+    const expected = [10]u16{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+    try testing.expectEqual(ClientMessageData{ .u16 = expected }, result);
+}
+
+test "clientMessageData format 32 returns u32 array" {
+    // Data bytes: little-endian quads become u32 values
+    const msg = proto.ClientMessage{
+        .format = 32,
+        .sequence_number = 0,
+        .window_id = 0,
+        .data_Type = 0,
+        .data = [_]u8{
+            0x01, 0x00, 0x00, 0x00, // 1
+            0x02, 0x00, 0x00, 0x00, // 2
+            0x03, 0x00, 0x00, 0x00, // 3
+            0x04, 0x00, 0x00, 0x00, // 4
+            0x05, 0x00, 0x00, 0x00, // 5
+        },
+    };
+
+    const result = clientMessageData(msg);
+    const expected = [5]u32{ 1, 2, 3, 4, 5 };
+    try testing.expectEqual(ClientMessageData{ .u32 = expected }, result);
+}
+
+test "clientMessageData unknown format defaults to u8" {
+    const msg = proto.ClientMessage{
+        .format = 64, // invalid format
+        .sequence_number = 0,
+        .window_id = 0,
+        .data_Type = 0,
+        .data = [_]u8{1} ** 20,
+    };
+
+    const result = clientMessageData(msg);
+    try testing.expectEqual(ClientMessageData{ .u8 = [_]u8{1} ** 20 }, result);
 }

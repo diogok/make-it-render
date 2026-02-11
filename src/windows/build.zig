@@ -11,7 +11,6 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .root_source_file = b.path("src/demo.zig"),
-            .win32_manifest = b.path("win32.manifest"),
         });
 
         const exe = b.addExecutable(.{

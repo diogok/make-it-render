@@ -38,3 +38,64 @@ pub const XID = struct {
         return self.last | self.base;
     }
 };
+
+test "XID init calculates increment from mask" {
+    const testing = std.testing;
+
+    // Typical X11 mask: 0x001fffff (21 bits for IDs)
+    const xid = XID.init(0x04000000, 0x001fffff);
+    try testing.expectEqual(@as(u32, 0x04000000), xid.base);
+    try testing.expectEqual(@as(u32, 0x001fffff), xid.max);
+    try testing.expectEqual(@as(u32, 1), xid.inc); // lowest bit is 1
+
+    // Mask with higher lowest bit: 0x001ffff0
+    const xid2 = XID.init(0x04000000, 0x001ffff0);
+    try testing.expectEqual(@as(u32, 16), xid2.inc); // lowest bit is 0x10 = 16
+}
+
+test "XID genID produces sequential IDs" {
+    const testing = std.testing;
+
+    var xid = XID.init(0x04000000, 0x001fffff);
+
+    // First ID should be base | inc
+    const id1 = try xid.genID();
+    try testing.expectEqual(@as(u32, 0x04000001), id1);
+
+    // Second ID increments
+    const id2 = try xid.genID();
+    try testing.expectEqual(@as(u32, 0x04000002), id2);
+
+    // Third ID increments
+    const id3 = try xid.genID();
+    try testing.expectEqual(@as(u32, 0x04000003), id3);
+}
+
+test "XID genID with larger increment" {
+    const testing = std.testing;
+
+    // Mask 0x10 means increment by 16
+    var xid = XID.init(0x100, 0xf0);
+    try testing.expectEqual(@as(u32, 16), xid.inc);
+
+    const id1 = try xid.genID();
+    try testing.expectEqual(@as(u32, 0x110), id1); // 0x100 | 0x10
+
+    const id2 = try xid.genID();
+    try testing.expectEqual(@as(u32, 0x120), id2); // 0x100 | 0x20
+}
+
+test "XID genID returns error when exhausted" {
+    const testing = std.testing;
+
+    // Small mask: only 3 IDs possible (0x1, 0x2, 0x3)
+    var xid = XID.init(0x100, 0x3);
+    try testing.expectEqual(@as(u32, 1), xid.inc);
+
+    _ = try xid.genID(); // 0x101
+    _ = try xid.genID(); // 0x102
+    _ = try xid.genID(); // 0x103, now last == max
+
+    // Next call should error
+    try testing.expectError(error.NoMoreIDs, xid.genID());
+}
