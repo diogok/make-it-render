@@ -186,6 +186,45 @@ pub const Window = struct {
         }
     }
 
+    pub fn setIcon(self: *@This(), icon: common.Icon) !void {
+        // Create color bitmap (top-down, 32bpp)
+        var color_pixels: [*]u8 = undefined;
+        const bitmap_info = win.BitmapInfo{
+            .header = .{
+                .width = @intCast(icon.width),
+                .height = -@as(i32, @intCast(icon.height)),
+            },
+        };
+        const color_bmp = win.CreateDIBSection(null, &bitmap_info, .RGB_COLORS, &color_pixels, null, 0);
+        if (color_bmp == null) return error.CreateIconFailed;
+        defer _ = win.DeleteObject(color_bmp);
+
+        // Copy RGBA -> BGRA
+        const pixel_count = icon.width * icon.height;
+        for (0..pixel_count) |i| {
+            const off = i * 4;
+            color_pixels[off + 0] = icon.pixels[off + 2]; // B
+            color_pixels[off + 1] = icon.pixels[off + 1]; // G
+            color_pixels[off + 2] = icon.pixels[off + 0]; // R
+            color_pixels[off + 3] = icon.pixels[off + 3]; // A
+        }
+
+        // Create mask bitmap (all zeros = fully visible)
+        const mask_bmp = win.CreateBitmap(@intCast(icon.width), @intCast(icon.height), 1, 1, null);
+        if (mask_bmp == null) return error.CreateIconFailed;
+        defer _ = win.DeleteObject(mask_bmp);
+
+        var icon_info = win.IconInfo{
+            .hbmMask = mask_bmp,
+            .hbmColor = color_bmp,
+        };
+        const hicon = win.CreateIconIndirect(&icon_info);
+        if (hicon == null) return error.CreateIconFailed;
+
+        _ = win.SendMessageW(self.handle, win.WM_SETICON, win.ICON_BIG, @intCast(@intFromPtr(hicon)));
+        _ = win.SendMessageW(self.handle, win.WM_SETICON, win.ICON_SMALL, @intCast(@intFromPtr(hicon)));
+    }
+
     pub fn createImage(self: *@This(), size: common.Size) !Image {
         return Image.init(self, size);
     }

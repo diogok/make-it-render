@@ -292,6 +292,25 @@ pub extern "user32" fn SetCursor(
 
 pub const CursorHandler = *anyopaque;
 
+// === Icons
+
+pub extern "user32" fn CreateIconIndirect(piconinfo: *IconInfo) callconv(.winapi) ?IconHandler;
+pub extern "user32" fn DestroyIcon(hIcon: ?IconHandler) callconv(.winapi) bool;
+pub extern "user32" fn SendMessageW(hWnd: ?WindowHandle, Msg: u32, wParam: usize, lParam: isize) callconv(.winapi) isize;
+pub extern "gdi32" fn CreateBitmap(nWidth: i32, nHeight: i32, nPlanes: u32, nBitCount: u32, lpBits: ?*const anyopaque) callconv(.winapi) ?Bitmap;
+
+pub const IconInfo = extern struct {
+    fIcon: i32 = 1,
+    xHotspot: u32 = 0,
+    yHotspot: u32 = 0,
+    hbmMask: ?Bitmap = null,
+    hbmColor: ?Bitmap = null,
+};
+
+pub const WM_SETICON: u32 = 0x0080;
+pub const ICON_BIG: usize = 1;
+pub const ICON_SMALL: usize = 0;
+
 // === Drawing
 
 pub extern "user32" fn UpdateWindow(

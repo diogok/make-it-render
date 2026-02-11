@@ -78,6 +78,21 @@ pub fn main() !void {
         },
     );
 
+    // set window icon from PBM z image
+    {
+        var icon_bitmap = try make_it_render.image.demo.demo(allocator);
+        defer icon_bitmap.deinit();
+
+        var icon_reader = try icon_bitmap.pixelReader(&[_]u8{ 255, 150, 0, 255 });
+        defer icon_reader.deinit();
+
+        try window.setIcon(.{
+            .width = icon_bitmap.width,
+            .height = icon_bitmap.height,
+            .pixels = icon_reader.buffer,
+        });
+    }
+
     // sync any pending operation
     try wm.flush();
 

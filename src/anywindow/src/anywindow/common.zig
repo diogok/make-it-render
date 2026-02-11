@@ -27,6 +27,12 @@ pub const Position = struct {
     y: Y = 0,
 };
 
+pub const Icon = struct {
+    width: u32,
+    height: u32,
+    pixels: []const u8, // RGBA, 4 bytes per pixel
+};
+
 pub const WindowOptions = struct {
     title: []const u8 = "",
     width: ?Width = null,

@@ -28,12 +28,14 @@ pub const WindowManager = struct {
 
         const atoms = Atoms{
             .atom = try x11.internAtom(conn, "ATOM"),
+            .cardinal = try x11.internAtom(conn, "CARDINAL"),
             .string = try x11.internAtom(conn, "STRING"),
             .wm_name = try x11.internAtom(conn, "WM_NAME"),
             .wm_protocols = try x11.internAtom(conn, "WM_PROTOCOLS"),
             .wm_delete_window = try x11.internAtom(conn, "WM_DELETE_WINDOW"),
             .net_wm_state = try x11.internAtom(conn, "_NET_WM_STATE"),
             .net_wm_state_fullscreen = try x11.internAtom(conn, "_NET_WM_STATE_FULLSCREEN"),
+            .net_wm_icon = try x11.internAtom(conn, "_NET_WM_ICON"),
         };
 
         const net_writer_buffer: []u8 = try allocator.alloc(u8, 4 * 1024);
@@ -365,6 +367,36 @@ pub const Window = struct {
         };
     }
 
+    pub fn setIcon(self: *@This(), icon: common.Icon) !void {
+        // _NET_WM_ICON format: width (u32), height (u32), ARGB pixels (u32 each)
+        const pixel_count = icon.width * icon.height;
+        const data_len = 2 + pixel_count;
+
+        const data = try self.wm.allocator.alloc(u32, data_len);
+        defer self.wm.allocator.free(data);
+
+        data[0] = icon.width;
+        data[1] = icon.height;
+
+        for (0..pixel_count) |i| {
+            const off = i * 4;
+            const a: u32 = icon.pixels[off + 3];
+            const r: u32 = icon.pixels[off + 0];
+            const g: u32 = icon.pixels[off + 1];
+            const b: u32 = icon.pixels[off + 2];
+            data[2 + i] = (a << 24) | (r << 16) | (g << 8) | b;
+        }
+
+        const set_icon_req = x11.proto.ChangeProperty{
+            .window_id = self.window_id,
+            .property = self.wm.atoms.net_wm_icon,
+            .property_type = self.wm.atoms.cardinal,
+            .format = 32,
+            .length_of_data = @truncate(data_len),
+        };
+        try x11.sendWithBytes(self.wm.conn, set_icon_req, std.mem.sliceAsBytes(data));
+    }
+
     pub fn createImage(self: *@This(), size: common.Size) !Image {
         return Image.init(self, size);
     }
@@ -546,12 +578,14 @@ fn x11ModsFromState(state: u16) common.Modifiers {
 
 const Atoms = struct {
     atom: u32,
+    cardinal: u32,
     string: u32,
     wm_name: u32,
     wm_protocols: u32,
     wm_delete_window: u32,
     net_wm_state: u32,
     net_wm_state_fullscreen: u32,
+    net_wm_icon: u32,
 };
 
 const std = @import("std");
