@@ -9,6 +9,9 @@
         .text = .{
             .path = "src/text",
         },
+        .image = .{
+            .path = "src/image",
+        },
         .canvas = .{
             .path = "src/canvas",
         },

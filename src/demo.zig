@@ -47,6 +47,24 @@ pub fn main() !void {
         try wm.flush();
     }
 
+    // render PBM image
+    {
+        var bitmap = try make_it_render.image.demo.demo(allocator);
+        defer bitmap.deinit();
+
+        var pixel_reader = try bitmap.pixelReader(&[_]u8{ 255, 150, 0, 1 });
+        defer pixel_reader.deinit();
+
+        var img = try canvas.createImageScaled(.{
+            .width = bitmap.width,
+            .height = bitmap.height,
+            .x = 50,
+            .y = 120,
+        });
+        try img.setPixels(&pixel_reader.interface);
+        try wm.flush();
+    }
+
     // render text to get size
     var mouse_pos_bitmap = try textz.render(allocator, fonts, "00000x00000");
     defer mouse_pos_bitmap.deinit();

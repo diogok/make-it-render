@@ -20,6 +20,9 @@ pub fn build(b: *std.Build) void {
     const text = b.dependency("text", .{ .target = target, .optimize = optimize });
     make_it_render.addImport("text", text.module("text"));
 
+    const image = b.dependency("image", .{ .target = target, .optimize = optimize });
+    make_it_render.addImport("image", image.module("image"));
+
     {
         const demo_mod = b.addModule("demo", .{
             .root_source_file = b.path("src/demo.zig"),
@@ -50,6 +53,7 @@ pub fn build(b: *std.Build) void {
         tests_mod.addImport("make_it_render", make_it_render);
         tests_mod.addImport("anywindow", anywindow.module("anywindow"));
         tests_mod.addImport("text", text.module("text"));
+        tests_mod.addImport("image", image.module("image"));
 
         const tests = b.addTest(.{
             .root_module = tests_mod,
