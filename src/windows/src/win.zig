@@ -392,6 +392,8 @@ pub extern "user32" fn GetDpiForWindow(
     hwnd: ?*anyopaque,
 ) callconv(.winapi) u32;
 
+pub extern "user32" fn GetKeyState(nVirtKey: c_int) callconv(.winapi) i16;
+
 pub extern "user32" fn SetProcessDPIAware() callconv(.winapi) Bool;
 pub extern "user32" fn GetDpiForSystem() callconv(.winapi) u32;
 

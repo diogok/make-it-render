@@ -1036,6 +1036,23 @@ pub const PutImage = extern struct {
     pad: [2]u8 = .{ 0, 0 },
 };
 
+pub const GetKeyboardMapping = extern struct {
+    opcode: u8 = 101,
+    unused: u8 = 0,
+    length: u16 = @sizeOf(@This()) / 4,
+    first_keycode: u8,
+    count: u8,
+    pad: [2]u8 = .{ 0, 0 },
+};
+
+pub const GetKeyboardMappingReply = extern struct {
+    code: u8 = 1,
+    keysyms_per_keycode: u8,
+    sequence_number: u16,
+    reply_length: u32,
+    pad: [24]u8,
+};
+
 pub const NoOperation = extern struct {
     opcode: u8 = 127,
     unused: u8 = 0,

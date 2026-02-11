@@ -392,20 +392,33 @@ pub fn windowProc(
             });
         },
         .WM_KEYDOWN => {
-            //const key: win.VirtualKeys = @enumFromInt(wparam);
-            //event[event_n].key_pressed.key = @enumFr;
+            const flags: win.KeystrokeFlags = @bitCast(lparam);
+            const sc = key_mapping.windowsScanToScancode(flags.scanCode, flags.extended == 1);
+            const vk: u8 = @truncate(wparam);
+            const key = key_mapping.windowsVkToKey(vk);
+            const mods = getWindowsModifiers();
 
             events.push(.{
                 .key_pressed = .{
-                    .key = 0,
+                    .scancode = sc,
+                    .key = key,
+                    .modifiers = mods,
                     .window_id = window_id,
                 },
             });
         },
         .WM_KEYUP => {
+            const flags: win.KeystrokeFlags = @bitCast(lparam);
+            const sc = key_mapping.windowsScanToScancode(flags.scanCode, flags.extended == 1);
+            const vk: u8 = @truncate(wparam);
+            const key = key_mapping.windowsVkToKey(vk);
+            const mods = getWindowsModifiers();
+
             events.push(.{
                 .key_released = .{
-                    .key = 0,
+                    .scancode = sc,
+                    .key = key,
+                    .modifiers = mods,
                     .window_id = window_id,
                 },
             });
@@ -433,9 +446,21 @@ fn commonPixelToWinPixel(src: [3]u8) u32 {
     return std.mem.bytesToValue(u32, &dst);
 }
 
+fn getWindowsModifiers() common.Modifiers {
+    return .{
+        .shift = win.GetKeyState(0x10) < 0,
+        .control = win.GetKeyState(0x11) < 0,
+        .alt = win.GetKeyState(0x12) < 0,
+        .super = (win.GetKeyState(0x5B) < 0) or (win.GetKeyState(0x5C) < 0),
+        .caps_lock = (win.GetKeyState(0x14) & 1) != 0,
+        .num_lock = (win.GetKeyState(0x90) & 1) != 0,
+    };
+}
+
 const std = @import("std");
 const win = @import("windows");
 const common = @import("common.zig");
 const queue = @import("queue.zig");
+const key_mapping = @import("key.zig");
 
 const log = std.log.scoped(.any_win32);

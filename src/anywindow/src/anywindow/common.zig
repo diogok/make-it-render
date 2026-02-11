@@ -5,7 +5,9 @@ pub const Width = u16;
 pub const X = i16;
 pub const Y = i16;
 
-pub const Key = u16;
+pub const Scancode = @import("scancode.zig").Scancode;
+pub const Key = @import("key.zig").Key;
+pub const Modifiers = @import("modifiers.zig").Modifiers;
 pub const MouseButton = u8;
 
 pub const BBox = struct {
@@ -64,11 +66,15 @@ pub const Event = union(enum) {
         window_id: WindowID,
     },
     key_pressed: struct {
+        scancode: Scancode,
         key: Key,
+        modifiers: Modifiers,
         window_id: WindowID,
     },
     key_released: struct {
+        scancode: Scancode,
         key: Key,
+        modifiers: Modifiers,
         window_id: WindowID,
     },
 };

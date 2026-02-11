@@ -13,6 +13,11 @@ pub const WindowManager = struct {
 
     scaling: f32,
 
+    keysym_map: []u32,
+    keysyms_per_keycode: u8,
+    min_keycode: u8,
+    max_keycode: u8,
+
     pub fn init(allocator: std.mem.Allocator) !@This() {
         const conn = try x11.connect(.{});
 
@@ -37,6 +42,35 @@ pub const WindowManager = struct {
 
         const scaling = getDesktopScaling(allocator) catch 1.0;
 
+        // Query keyboard mapping
+        const min_kc = info.min_keycode;
+        const max_kc = info.max_keycode;
+        const kc_count = max_kc - min_kc + 1;
+
+        try x11.send(conn, x11.proto.GetKeyboardMapping{
+            .first_keycode = min_kc,
+            .count = kc_count,
+        });
+        const kb_reply = try x11.receiveReply(conn, x11.proto.GetKeyboardMappingReply);
+
+        var keysyms_per_keycode: u8 = 0;
+        var keysym_map: []u32 = &[_]u32{};
+
+        if (kb_reply) |r| {
+            keysyms_per_keycode = r.keysyms_per_keycode;
+            const total_keysyms: u32 = @as(u32, kc_count) * @as(u32, keysyms_per_keycode);
+            keysym_map = try allocator.alloc(u32, total_keysyms);
+            errdefer allocator.free(keysym_map);
+
+            const keysym_bytes = std.mem.sliceAsBytes(keysym_map);
+            var bytes_read: usize = 0;
+            while (bytes_read < keysym_bytes.len) {
+                const n = try conn.read(keysym_bytes[bytes_read..]);
+                if (n == 0) return error.ConnectionClosed;
+                bytes_read += n;
+            }
+        }
+
         return @This(){
             .allocator = allocator,
             .conn = conn,
@@ -49,11 +83,17 @@ pub const WindowManager = struct {
 
             .scaling = scaling,
 
+            .keysym_map = keysym_map,
+            .keysyms_per_keycode = keysyms_per_keycode,
+            .min_keycode = min_kc,
+            .max_keycode = max_kc,
+
             .events = .init(),
         };
     }
 
     pub fn deinit(self: *@This()) void {
+        self.allocator.free(self.keysym_map);
         self.conn.close();
         self.info.deinit();
         self.allocator.free(self.net_writer_buffer);
@@ -95,18 +135,32 @@ pub const WindowManager = struct {
                     return .{ .nop = {} };
                 },
                 .KeyRelease => |key_release| {
+                    const evdev_code = key_release.keycode -| 8;
+                    const sc = key_mapping.evdevToScancode(evdev_code);
+                    const keysym = self.lookupKeysym(key_release.keycode, key_release.state);
+                    const key = key_mapping.x11KeysymToKey(keysym);
+                    const mods = x11ModsFromState(key_release.state);
                     return .{
                         .key_released = .{
+                            .scancode = sc,
+                            .key = key,
+                            .modifiers = mods,
                             .window_id = key_release.event_window,
-                            .key = key_release.keycode,
                         },
                     };
                 },
                 .KeyPress => |key_press| {
+                    const evdev_code = key_press.keycode -| 8;
+                    const sc = key_mapping.evdevToScancode(evdev_code);
+                    const keysym = self.lookupKeysym(key_press.keycode, key_press.state);
+                    const key = key_mapping.x11KeysymToKey(keysym);
+                    const mods = x11ModsFromState(key_press.state);
                     return .{
                         .key_pressed = .{
+                            .scancode = sc,
+                            .key = key,
+                            .modifiers = mods,
                             .window_id = key_press.event_window,
-                            .key = key_press.keycode,
                         },
                     };
                 },
@@ -159,6 +213,24 @@ pub const WindowManager = struct {
                 return err;
             }
         };
+    }
+
+    pub fn lookupKeysym(self: *@This(), keycode: u8, state: u16) u32 {
+        if (keycode < self.min_keycode or keycode > self.max_keycode) return 0;
+        const offset = keycode - self.min_keycode;
+        const base: usize = @as(usize, offset) * @as(usize, self.keysyms_per_keycode);
+        if (base >= self.keysym_map.len) return 0;
+
+        // Column 0 = unshifted, column 1 = shifted
+        const shifted = (state & 0x01) != 0; // Shift bit in KeyButMask
+        const col: usize = if (shifted and self.keysyms_per_keycode > 1) 1 else 0;
+        const idx = base + col;
+        if (idx >= self.keysym_map.len) return 0;
+
+        const sym = self.keysym_map[idx];
+        // If shifted column is NoSymbol (0), fall back to unshifted
+        if (sym == 0 and col == 1) return self.keysym_map[base];
+        return sym;
     }
 };
 
@@ -442,6 +514,17 @@ fn getDesktopScaling(allocator: std.mem.Allocator) !f32 {
 
     return scaling / 96;
 }
+fn x11ModsFromState(state: u16) common.Modifiers {
+    return .{
+        .shift = (state & 0x01) != 0, // ShiftMask
+        .control = (state & 0x04) != 0, // ControlMask
+        .alt = (state & 0x08) != 0, // Mod1Mask (typically Alt)
+        .super = (state & 0x40) != 0, // Mod4Mask (typically Super)
+        .caps_lock = (state & 0x02) != 0, // LockMask
+        .num_lock = (state & 0x10) != 0, // Mod2Mask (typically NumLock)
+    };
+}
+
 const Atoms = struct {
     atom: u32,
     string: u32,
@@ -454,5 +537,6 @@ const std = @import("std");
 const x11 = @import("x11");
 const common = @import("common.zig");
 const queue = @import("queue.zig");
+const key_mapping = @import("key.zig");
 
 const log = std.log.scoped(.any_x11);
