@@ -397,6 +397,27 @@ pub extern "user32" fn GetKeyState(nVirtKey: c_int) callconv(.winapi) i16;
 pub extern "user32" fn SetProcessDPIAware() callconv(.winapi) Bool;
 pub extern "user32" fn GetDpiForSystem() callconv(.winapi) u32;
 
+// Fullscreen support
+pub extern "user32" fn GetWindowLongPtrW(hWnd: ?WindowHandle, nIndex: c_int) callconv(.winapi) isize;
+pub extern "user32" fn SetWindowLongPtrW(hWnd: ?WindowHandle, nIndex: c_int, dwNewLong: isize) callconv(.winapi) isize;
+pub extern "user32" fn SetWindowPos(hWnd: ?WindowHandle, hWndInsertAfter: ?WindowHandle, x: c_int, y: c_int, cx: c_int, cy: c_int, uFlags: u32) callconv(.winapi) bool;
+pub extern "user32" fn MonitorFromWindow(hwnd: ?WindowHandle, dwFlags: u32) callconv(.winapi) ?Monitor;
+pub extern "user32" fn GetMonitorInfoW(hMonitor: ?Monitor, lpmi: *MonitorInfo) callconv(.winapi) bool;
+
+pub const GWL_STYLE: c_int = -16;
+pub const HWND_TOP: ?WindowHandle = null;
+pub const SWP_FRAMECHANGED: u32 = 0x0020;
+pub const SWP_NOOWNERZORDER: u32 = 0x0200;
+pub const SWP_NOZORDER: u32 = 0x0004;
+pub const MONITOR_DEFAULTTOPRIMARY: u32 = 1;
+
+pub const MonitorInfo = extern struct {
+    cbSize: u32 = @sizeOf(MonitorInfo),
+    rcMonitor: Rect = .{},
+    rcWork: Rect = .{},
+    dwFlags: u32 = 0,
+};
+
 pub const DeviceContext = *anyopaque;
 pub const Bitmap = *anyopaque;
 pub const Monitor = *anyopaque;

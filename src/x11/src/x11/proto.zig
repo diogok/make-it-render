@@ -828,6 +828,24 @@ pub const ListProperties = extern struct {
 
 //TODO: ListProperties Reply
 
+pub const ClientMessageEvent = extern struct {
+    code: u8 = 33,
+    format: u8 = 32,
+    sequence_number: u16 = 0,
+    window_id: u32,
+    message_type: u32,
+    data: [5]u32 = .{ 0, 0, 0, 0, 0 },
+};
+
+pub const SendEvent = extern struct {
+    opcode: u8 = 25,
+    propagate: u8 = 0,
+    length: u16 = @sizeOf(@This()) / 4,
+    destination: u32,
+    event_mask: u32 = 0,
+    event: [32]u8,
+};
+
 pub const CreatePixmap = extern struct {
     opcode: u8 = 53,
     depth: u8,

@@ -62,6 +62,11 @@ pub const Window = struct {
 
     scaling: f32 = 1.0,
 
+    // fullscreen state
+    is_fullscreen: bool = false,
+    saved_style: isize = 0,
+    saved_rect: win.Rect = .{},
+
     pub fn init(wm: *WindowManager, options: common.WindowOptions) !@This() {
         const class_name_n = try std.fmt.allocPrint(wm.allocator, "WindowClass_{d}", .{class_count});
         defer wm.allocator.free(class_name_n);
@@ -135,6 +140,50 @@ pub const Window = struct {
     pub fn show(self: *@This()) !void {
         _ = win.ShowWindow(self.handle, 1);
         while (win.ShowCursor(true) < 1) {}
+    }
+
+    pub fn toggleFullscreen(self: *@This()) void {
+        if (!self.is_fullscreen) {
+            // Save current style and window rect
+            self.saved_style = win.GetWindowLongPtrW(self.handle, win.GWL_STYLE);
+            _ = win.GetWindowRect(self.handle, &self.saved_rect);
+
+            // Remove title bar and borders
+            const new_style = self.saved_style & ~@as(isize, @intFromEnum(win.WindowStyle.OverlappedWindow));
+            _ = win.SetWindowLongPtrW(self.handle, win.GWL_STYLE, new_style);
+
+            // Get monitor dimensions
+            var mi = win.MonitorInfo{};
+            const monitor = win.MonitorFromWindow(self.handle, win.MONITOR_DEFAULTTOPRIMARY);
+            _ = win.GetMonitorInfoW(monitor, &mi);
+
+            // Resize to cover the monitor
+            _ = win.SetWindowPos(
+                self.handle,
+                win.HWND_TOP,
+                mi.rcMonitor.left,
+                mi.rcMonitor.top,
+                mi.rcMonitor.right - mi.rcMonitor.left,
+                mi.rcMonitor.bottom - mi.rcMonitor.top,
+                win.SWP_FRAMECHANGED | win.SWP_NOOWNERZORDER,
+            );
+            self.is_fullscreen = true;
+        } else {
+            // Restore style
+            _ = win.SetWindowLongPtrW(self.handle, win.GWL_STYLE, self.saved_style);
+
+            // Restore position and size
+            _ = win.SetWindowPos(
+                self.handle,
+                win.HWND_TOP,
+                self.saved_rect.left,
+                self.saved_rect.top,
+                self.saved_rect.right - self.saved_rect.left,
+                self.saved_rect.bottom - self.saved_rect.top,
+                win.SWP_FRAMECHANGED | win.SWP_NOOWNERZORDER | win.SWP_NOZORDER,
+            );
+            self.is_fullscreen = false;
+        }
     }
 
     pub fn createImage(self: *@This(), size: common.Size) !Image {

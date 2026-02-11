@@ -99,7 +99,14 @@ pub fn main() !void {
 
                 log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.ns_per_ms});
             },
-            .mouse_pressed, .mouse_released, .key_pressed, .key_released => {
+            .key_pressed => |key_event| {
+                if (key_event.key == .f) {
+                    window.toggleFullscreen();
+                    try window.redraw(.{});
+                }
+                log.debug("{any}", .{event});
+            },
+            .mouse_pressed, .mouse_released, .key_released => {
                 log.debug("{any}", .{event});
             },
             .mouse_moved => |move| {

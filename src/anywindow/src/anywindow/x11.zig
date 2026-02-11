@@ -32,6 +32,8 @@ pub const WindowManager = struct {
             .wm_name = try x11.internAtom(conn, "WM_NAME"),
             .wm_protocols = try x11.internAtom(conn, "WM_PROTOCOLS"),
             .wm_delete_window = try x11.internAtom(conn, "WM_DELETE_WINDOW"),
+            .net_wm_state = try x11.internAtom(conn, "_NET_WM_STATE"),
+            .net_wm_state_fullscreen = try x11.internAtom(conn, "_NET_WM_STATE_FULLSCREEN"),
         };
 
         const net_writer_buffer: []u8 = try allocator.alloc(u8, 4 * 1024);
@@ -346,6 +348,23 @@ pub const Window = struct {
         try x11.send(self.wm.conn, map_req);
     }
 
+    pub fn toggleFullscreen(self: *@This()) void {
+        const msg = x11.proto.ClientMessageEvent{
+            .window_id = self.window_id,
+            .message_type = self.wm.atoms.net_wm_state,
+            .data = .{ 2, self.wm.atoms.net_wm_state_fullscreen, 0, 0, 0 },
+        };
+
+        const send_event = x11.proto.SendEvent{
+            .destination = self.root,
+            .event_mask = x11.mask(&[_]x11.proto.EventMask{ .SubstructureNotify, .SubstructureRedirect }),
+            .event = std.mem.toBytes(msg),
+        };
+        x11.send(self.wm.conn, send_event) catch |err| {
+            log.err("Error sending fullscreen toggle: {any}", .{err});
+        };
+    }
+
     pub fn createImage(self: *@This(), size: common.Size) !Image {
         return Image.init(self, size);
     }
@@ -531,6 +550,8 @@ const Atoms = struct {
     wm_name: u32,
     wm_protocols: u32,
     wm_delete_window: u32,
+    net_wm_state: u32,
+    net_wm_state_fullscreen: u32,
 };
 
 const std = @import("std");
