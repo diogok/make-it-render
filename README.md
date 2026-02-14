@@ -1,55 +1,109 @@
 # Make it render
 
-This is a Zig library for cross-platform window handling and basic rendering, without any dependencies.
+A Zig library for cross-platform window handling and CPU-based rendering, without any dependencies.
 
 It is an experimental project with constant changes.
 
 ## What this is
 
-- Glue code and abstraction between X11, Windows and MacOS(soon?) window and input handling
-- Support window management, input events and rendering
-- Basic text and images drawing
-- It only uses C when linking to win32 required libraries
-- Produces small and performant binaries
-- No dependencies
-- All in one
+- Abstraction between X11, Windows and macOS (soon?)
+- Window management, keyboard and mouse input events
+- Text rendering with Unicode support (embedded Terminus and Unifont fonts)
+- Image loading (PBM format) and scaling
+- A Canvas to put pixels on
+- Pure Zig — only uses C when linking to Win32 required libraries
+- Produces small and performant statically-linked binaries
+- No dependencies, all in one
 
 ## What this is not
 
 - It is not a GUI library or game engine
-- It does not use GPU (no opengl nor vulkan)
+- It does not use GPU (no OpenGL nor Vulkan)
 - It does not support mobile (no Android nor iOS)
 
 ## Structure
 
-Each module is independent, should be usable by itself if wanted, and them there is some "glue" modules to make it all work togheter.
+Each module is independent and usable by itself. The glue module ties them together.
 
-- anywindow: Window handling abstraction
-	- macos
-	- x11
-	- windows
-- text: Read fonts, get glyphs, work with unicode
-	- fonts: embed unifont and terminus
-	- bdf: BDF parsing
-- image: Read images
-	- pbm: Read from PBM format
-- glue.zig: Joins everything
-	- canvas: Infinit drawing canvas
-	- image: Image scaling
+- **anywindow** — Window handling abstraction
+	- x11: native X11 protocol implementation (no Xlib)
+	- windows: Win32 API
+	- macos: (planned)
+- **text** — Font loading, glyph rendering, Unicode support
+	- fonts: embedded Unifont and Terminus (multiple sizes)
+	- bdf: BDF font format parser (with gzip support)
+- **image** — Image loading
+	- pbm: PBM format (P1 ASCII and P4 binary)
+- **glue.zig** — Joins everything
+	- canvas: infinite drawing canvas with z-order
+	- image: nearest-neighbor scaling
 
 ## Work in progress
 
 Notably missing:
 
 - Wayland support
-- MacOS support
+- macOS support
 
 ## Usage
 
-To do.
+### Building
 
-See [src/demo.zig](src/demo.zig) for an example.
+```sh
+zig build        # build the library and demo
+zig build run    # run the demo
+zig build test   # run tests
+zig build docs   # generate documentation
+```
 
-## License 
+### As a dependency
+
+```sh
+zig fetch --save git+https://github.com/diogok/make-it-render
+```
+
+Then in your `build.zig`, import the module:
+
+```zig
+const make_it_render = b.dependency("make_it_render", .{ .target = target, .optimize = optimize });
+exe_mod.addImport("make_it_render", make_it_render.module("make_it_render"));
+```
+
+### Example
+
+```zig
+const std = @import("std");
+const make_it_render = @import("make_it_render");
+
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer std.debug.assert(gpa.deinit() != .leak);
+    const allocator = gpa.allocator();
+
+    var wm = try make_it_render.anywindow.WindowManager.init(allocator);
+    defer wm.deinit();
+
+    var window = try wm.createWindow(.{ .title = "hello, world." });
+    defer window.deinit();
+
+    var canvas = make_it_render.glue.Canvas.init(allocator, &window);
+    defer canvas.deinit();
+
+    try window.show();
+
+    while (window.status == .open) {
+        const event = try wm.receive();
+        switch (event) {
+            .close => window.close(),
+            .draw => try canvas.draw(),
+            else => {},
+        }
+    }
+}
+```
+
+See [src/demo.zig](src/demo.zig) for a more complete example with text rendering, image loading, mouse tracking, and fullscreen toggle.
+
+## License
 
 MIT
