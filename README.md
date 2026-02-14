@@ -4,14 +4,15 @@ This is a Zig library for cross-platform window handling and basic rendering, wi
 
 It is an experimental project with constant changes.
 
-## What is this
+## What this is
 
 - Glue code and abstraction between X11, Windows and MacOS(soon?) window and input handling
 - Support window management, input events and rendering
+- Basic text and images drawing
 - It only uses C when linking to win32 required libraries
-- Produces small binaries, relatively fast
-- Render text
+- Produces small and performant binaries
 - No dependencies
+- All in one
 
 ## What this is not
 
@@ -21,7 +22,7 @@ It is an experimental project with constant changes.
 
 ## Structure
 
-Each module is independent, should be usable, and them there some "glue" modules to make it all work.
+Each module is independent, should be usable by itself if wanted, and them there is some "glue" modules to make it all work togheter.
 
 - anywindow: Window handling abstraction
 	- macos
@@ -30,25 +31,24 @@ Each module is independent, should be usable, and them there some "glue" modules
 - text: Read fonts, get glyphs, work with unicode
 	- fonts: embed unifont and terminus
 	- bdf: BDF parsing
+- image: Read images
+	- pbm: Read from PBM format
 - glue.zig: Joins everything
+	- canvas: Infinit drawing canvas
+	- image: Image scaling
 
 ## Work in progress
 
 Notably missing:
 
-- Improve keyboard handling
-- Fullscreen windows and back
-- Icons
-- Image drawing, like from PNGs or other image formats
 - Wayland support
 - MacOS support
-- Check changes in DPI
 
 ## Usage
 
 To do.
 
-See [src/demo.zig] for an example.
+See [src/demo.zig](src/demo.zig) for an example.
 
 ## License 
 
