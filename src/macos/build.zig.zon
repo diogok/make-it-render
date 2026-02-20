@@ -1,0 +1,12 @@
+.{
+    .name = .macos,
+    .fingerprint = 0x45e2f6102a24f622,
+    .version = "0.0.0",
+    .dependencies = .{
+    },
+    .paths = .{
+        "buid.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

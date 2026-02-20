@@ -22,7 +22,7 @@ pub fn main() !void {
     defer freeFonts(allocator, fonts);
     log.debug("Time to load fonts: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
-    var canvas = make_it_render.glue.Canvas.init(allocator, &window);
+    var canvas = canvaz.Canvas.init(allocator, &window);
     defer canvas.deinit();
 
     // let's draw Welcomes
@@ -49,7 +49,8 @@ pub fn main() !void {
 
     // render PBM image
     {
-        var bitmap = try make_it_render.image.demo.demo(allocator);
+        var z_reader = std.Io.Reader.fixed(z);
+        var bitmap = try make_it_render.image.parse(allocator,&z_reader );
         defer bitmap.deinit();
 
         var pixel_reader = try bitmap.pixelReader(&[_]u8{ 255, 150, 0, 1 });
@@ -80,7 +81,8 @@ pub fn main() !void {
 
     // set window icon from PBM z image
     {
-        var icon_bitmap = try make_it_render.image.demo.demo(allocator);
+        var z_reader = std.Io.Reader.fixed(z);
+        var icon_bitmap = try make_it_render.image.parse(allocator,&z_reader);
         defer icon_bitmap.deinit();
 
         var icon_reader = try icon_bitmap.pixelReader(&[_]u8{ 255, 150, 0, 255 });
@@ -182,12 +184,14 @@ const welcome = [_][]const u8{
     // TODO: LTR,
 };
 
+const z = @embedFile("image/src/demo.pbm");
+
 const std = @import("std");
 const make_it_render = @import("make_it_render");
 
 const anywin = make_it_render.anywindow;
 const textz = make_it_render.text;
-//const canvas = make_it_render.canvas;
+const canvaz = make_it_render.canvas;
 
 const log = std.log.scoped(.demo);
 

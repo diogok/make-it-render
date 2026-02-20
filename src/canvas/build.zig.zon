@@ -1,0 +1,18 @@
+.{
+    .name = .canvas,
+    .fingerprint = 0xa59f6c18f6fa61f2,
+    .version = "0.0.0",
+    .dependencies = .{
+        .anywindow = .{
+            .path = "../anywindow",
+        },
+        .text = .{
+            .path = "../text",
+        },
+    },
+    .paths = .{
+        "buid.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

@@ -26,4 +26,20 @@ pub fn build(b: *std.Build) void {
         const run_step = b.step("run", "Run demo for windows");
         run_step.dependOn(&run_cmd.step);
     }
+
+    {
+        const tests_mod = b.addModule("tests", .{
+            .target = target,
+            .optimize = optimize,
+            .root_source_file = b.path("src/win.zig"),
+        });
+
+        const tests = b.addTest(.{
+            .root_module = tests_mod,
+        });
+
+        const run_tests = b.addRunArtifact(tests);
+        const run_tests_step = b.step("test", "Run tests");
+        run_tests_step.dependOn(&run_tests.step);
+    }
 }

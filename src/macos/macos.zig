@@ -5,17 +5,17 @@ pub const Class = ID;
 pub const Selector = ID;
 pub const Protocol = ID;
 
-const MsgSend = *const fn (class: ?*Class, sel: ?*Selector) callconv(.C) ?*ID;
-const GetClass = *const fn (name: [*c]const u8) callconv(.C) ?*Class;
-const RegisterName = *const fn (name: [*c]const u8) callconv(.C) ?*Selector;
+const MsgSend = *const fn (class: ?*Class, sel: ?*Selector) callconv(.c) ?*ID;
+const GetClass = *const fn (name: [*c]const u8) callconv(.c) ?*Class;
+const RegisterName = *const fn (name: [*c]const u8) callconv(.c) ?*Selector;
 
-const AllocateClassPair = *const fn (class: ?*Class, name: [*c]const u8, extra_bytes: c_int) callconv(.C) ?*Class;
-const RegisterClassPair = *const fn (class: ?*Class) callconv(.C) void;
-const AddMethod = *const fn (class: ?*Class, name: ?*Selector, imp: Implementation, types: [*c]const u8) callconv(.C) bool;
-const GetProtocol = *const fn (name: [*c]const u8) callconv(.C) ?*Protocol;
-const AddProtocol = *const fn (?*Class, ?*Protocol) callconv(.C) bool;
+const AllocateClassPair = *const fn (class: ?*Class, name: [*c]const u8, extra_bytes: c_int) callconv(.c) ?*Class;
+const RegisterClassPair = *const fn (class: ?*Class) callconv(.c) void;
+const AddMethod = *const fn (class: ?*Class, name: ?*Selector, imp: Implementation, types: [*c]const u8) callconv(.c) bool;
+const GetProtocol = *const fn (name: [*c]const u8) callconv(.c) ?*Protocol;
+const AddProtocol = *const fn (?*Class, ?*Protocol) callconv(.c) bool;
 
-const Implementation = *const fn (id: ?*ID, selector: ?*Selector, window: ?*ID) callconv(.C) bool;
+const Implementation = *const fn (id: ?*ID, selector: ?*Selector, window: ?*ID) callconv(.c) bool;
 
 pub const load = Fns.init;
 
@@ -25,15 +25,15 @@ const Fns = struct {
 
     msgSend: MsgSend,
 
-    msgSend_ID: *const fn (class: ?*Class, sel: ?*Selector) callconv(.C) ?*ID,
-    msgSend_Void: *const fn (class: ?*Class, sel: ?*Selector) callconv(.C) void,
-    msgSend_ID_Void: *const fn (class: ?*Class, sel: ?*Selector, id: ?*ID) callconv(.C) void,
-    msgSend_Int_Bool: *const fn (class: ?*Class, sel: ?*Selector, arg1: c_uint) callconv(.C) bool,
-    msgSend_Bool_Void: *const fn (class: ?*Class, sel: ?*Selector, arg1: bool) callconv(.C) void,
-    msgSend_String_ID: *const fn (class: ?*Class, sel: ?*Selector, id: [*c]const u8) callconv(.C) ?*ID,
-    msgSend_String_Void: *const fn (class: ?*Class, sel: ?*Selector, id: [*c]const u8) callconv(.C) void,
+    msgSend_ID: *const fn (class: ?*Class, sel: ?*Selector) callconv(.c) ?*ID,
+    msgSend_Void: *const fn (class: ?*Class, sel: ?*Selector) callconv(.c) void,
+    msgSend_ID_Void: *const fn (class: ?*Class, sel: ?*Selector, id: ?*ID) callconv(.c) void,
+    msgSend_Int_Bool: *const fn (class: ?*Class, sel: ?*Selector, arg1: c_uint) callconv(.c) bool,
+    msgSend_Bool_Void: *const fn (class: ?*Class, sel: ?*Selector, arg1: bool) callconv(.c) void,
+    msgSend_String_ID: *const fn (class: ?*Class, sel: ?*Selector, id: [*c]const u8) callconv(.c) ?*ID,
+    msgSend_String_Void: *const fn (class: ?*Class, sel: ?*Selector, id: [*c]const u8) callconv(.c) void,
 
-    msgSend_WindowInit_ID: *const fn (class: ?*Class, sel: ?*Selector, rect: Rect, style_mask: c_uint, backing_store: c_uint, _defer: bool) callconv(.C) ?*ID,
+    msgSend_WindowInit_ID: *const fn (class: ?*Class, sel: ?*Selector, rect: Rect, style_mask: c_uint, backing_store: c_uint, _defer: bool) callconv(.c) ?*ID,
 
     allocateClassPair: AllocateClassPair,
     registerClassPair: RegisterClassPair,

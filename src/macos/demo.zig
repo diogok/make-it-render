@@ -1,5 +1,5 @@
 const std = @import("std");
-const mac = @import("mac.zig");
+const mac = @import("macos");
 
 const log = std.log.scoped(.main);
 
