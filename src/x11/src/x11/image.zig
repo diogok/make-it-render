@@ -108,8 +108,7 @@ pub const RgbaToZPixmapReader = struct {
     buffer: [1024]u8 = undefined,
 
     pub fn init(_: ImageInfo, reader: *std.Io.Reader) @This() {
-        return @This(){
-            //.buffer = undefined,
+        return .{
             .reader = reader,
 
             .interface_state = .{

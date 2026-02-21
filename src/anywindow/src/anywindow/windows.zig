@@ -12,7 +12,7 @@ pub const WindowManager = struct {
         }
         _ = win.SetProcessDPIAware();
 
-        return @This(){
+        return .{
             .allocator = allocator,
             .instance = instance,
         };
@@ -116,7 +116,7 @@ pub const Window = struct {
         const dpi = win.GetDpiForWindow(handle);
         const scaling: f32 = @as(f32, @floatFromInt(dpi)) / 96.0;
 
-        return @This(){
+        return .{
             .wm = wm,
             .handle = handle,
             .frame = frame_handle,
@@ -297,7 +297,7 @@ pub const Image = struct {
             return error.ErrorCreatingImage;
         }
 
-        return @This(){
+        return .{
             .bitmap = bitmap.?,
             .window = window,
             .size = size,

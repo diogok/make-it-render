@@ -416,7 +416,7 @@ test "setPixel within bounds" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 4,
@@ -438,7 +438,7 @@ test "setPixel out of bounds is ignored" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 2,
@@ -463,7 +463,7 @@ test "fillRect fills correct region" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 4,
@@ -493,7 +493,7 @@ test "fillRect clips to bounds" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 4,
@@ -519,7 +519,7 @@ test "clearRect zeroes region" {
     defer allocator.free(buf);
     @memset(buf, 255);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 4,
@@ -541,7 +541,7 @@ test "strokeRect draws outline only" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 6,
@@ -569,7 +569,7 @@ test "drawLine horizontal" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 5,
@@ -594,7 +594,7 @@ test "drawLine vertical" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
@@ -617,7 +617,7 @@ test "drawLine diagonal" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 4,
@@ -643,7 +643,7 @@ test "fill triangle" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 10,
@@ -675,7 +675,7 @@ test "stroke path" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 5,
@@ -705,7 +705,7 @@ test "setPixel opaque src over transparent dst" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
@@ -723,7 +723,7 @@ test "setPixel opaque src over opaque dst uses fast path" {
     defer allocator.free(buf);
     buf[0] = 10; buf[1] = 20; buf[2] = 30; buf[3] = 255;
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
@@ -741,7 +741,7 @@ test "setPixel transparent src leaves dst unchanged" {
     defer allocator.free(buf);
     buf[0] = 10; buf[1] = 20; buf[2] = 30; buf[3] = 255;
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
@@ -760,7 +760,7 @@ test "setPixel 50% alpha red over opaque white gives pinkish result" {
     // white background
     buf[0] = 255; buf[1] = 255; buf[2] = 255; buf[3] = 255;
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
@@ -786,7 +786,7 @@ test "setPixel 50% alpha red over transparent dst" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
@@ -811,7 +811,7 @@ test "drawImage 2x2 opaque red onto transparent buffer" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 4,
@@ -841,7 +841,7 @@ test "drawImage 50% alpha over opaque white" {
     defer allocator.free(buf);
     buf[0] = 255; buf[1] = 255; buf[2] = 255; buf[3] = 255;
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
@@ -864,7 +864,7 @@ test "drawImage at negative offset clips without crash" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 2,
@@ -891,7 +891,7 @@ test "drawImage larger than canvas clips without crash" {
     defer allocator.free(buf);
     @memset(buf, 0);
 
-    var ctx = @This(){
+    var ctx: @This() = .{
         .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 2,

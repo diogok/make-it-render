@@ -75,7 +75,7 @@ pub const WindowManager = struct {
             try reader.readSliceAll(keysym_bytes);
         }
 
-        return @This(){
+        return .{
             .allocator = allocator,
             .conn = conn,
             .info = info,
@@ -319,7 +319,7 @@ pub const Window = struct {
         };
         try x11.sendWithValues(wm.conn, create_gc, graphic_context_values);
 
-        return @This(){
+        return .{
             .window_id = window_id,
             .wm = wm,
             .status = .open,
@@ -464,7 +464,7 @@ pub const Image = struct {
 
         try x11.write(&window.wm.net_writer.interface, pixmap_req);
 
-        return @This(){
+        return .{
             .image_id = pixmap_id,
             .window = window,
             .size = size,

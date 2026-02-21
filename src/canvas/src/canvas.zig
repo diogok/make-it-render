@@ -4,9 +4,9 @@ allocator: std.mem.Allocator,
 
 /// Create a new Canvas bound to a window.
 pub fn init(allocator: std.mem.Allocator, window: *anywin.Window) @This() {
-    return @This(){
+    return .{
         .window = window,
-        .images = std.ArrayList(*Image){},
+        .images = .{},
         .allocator = allocator,
     };
 }

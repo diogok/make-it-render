@@ -81,7 +81,7 @@ const PixelReader = struct {
                 std.mem.copyForwards(u8, buffer[i * 4 ..], &[4]u8{ 0, 0, 0, 0 });
             }
         }
-        return @This(){
+        return .{
             .allocator = allocator,
             .interface = std.io.Reader.fixed(buffer),
             .buffer = buffer,
