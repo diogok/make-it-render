@@ -2,6 +2,7 @@ window: *anywin.Window,
 images: std.ArrayList(*Image),
 allocator: std.mem.Allocator,
 
+/// Create a new Canvas bound to a window.
 pub fn init(allocator: std.mem.Allocator, window: *anywin.Window) @This() {
     return @This(){
         .window = window,
@@ -18,6 +19,8 @@ pub fn deinit(self: *@This()) void {
     self.images.deinit(self.allocator);
 }
 
+/// Create a new Image at the given bounding box. Automatically applies
+/// DPI scaling when the window has a scaling factor other than 1.0.
 pub fn createImage(self: *@This(), bbox: anywin.common.BBox) !*Image {
     const img = try self.allocator.create(anywin.Image);
     errdefer self.allocator.destroy(img);
@@ -52,6 +55,7 @@ pub fn createImage(self: *@This(), bbox: anywin.common.BBox) !*Image {
     return image;
 }
 
+/// Remove an Image from the canvas and free its resources.
 pub fn removeImage(self: *@This(), image: *Image) void {
     for (self.images.items, 0..) |img, i| {
         if (img == image) {
@@ -63,6 +67,7 @@ pub fn removeImage(self: *@This(), image: *Image) void {
     self.allocator.destroy(image);
 }
 
+/// Composite all images onto the window, clearing it first.
 pub fn draw(self: *@This()) !void {
     try self.window.beginDraw();
     try self.window.clear(.{});

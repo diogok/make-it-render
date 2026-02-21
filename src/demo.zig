@@ -27,23 +27,21 @@ pub fn main() !void {
 
     // let's draw Welcomes
     for (welcome, 0..) |txt, i| {
-        // get text bitmap
         var text = try textz.render(allocator, fonts, txt);
         defer text.deinit();
 
-        var pixel_reader = try text.pixelReader(&[_]u8{ 255, 150, 0, 1 });
-        defer pixel_reader.deinit();
+        var img = try canvas.createImage(.{
+            .height = text.height,
+            .width = text.width,
+            .x = 100,
+            .y = 100 + (@as(u8, @truncate(i)) * 20),
+        });
+        var ctx = try img.getContext();
+        defer ctx.deinit();
 
-        // create the image for each
-        var img = try canvas.createImage(
-            .{
-                .height = text.height,
-                .width = text.width,
-                .x = 100,
-                .y = 100 + (@as(u8, @truncate(i)) * 20),
-            },
-        );
-        try img.setPixels(&pixel_reader.interface);
+        ctx.setFillColor(.{ 255, 150, 0, 1 });
+        ctx.fillText(fonts, txt, 0, 0);
+        try ctx.flush();
         try wm.flush();
     }
 
@@ -53,31 +51,31 @@ pub fn main() !void {
         var bitmap = try make_it_render.image.parse(allocator, &z_reader);
         defer bitmap.deinit();
 
-        var pixel_reader = try bitmap.pixelReader(&[_]u8{ 255, 150, 0, 1 });
-        defer pixel_reader.deinit();
-
         var img = try canvas.createImage(.{
             .width = bitmap.width,
             .height = bitmap.height,
             .x = 50,
             .y = 120,
         });
-        try img.setPixels(&pixel_reader.interface);
+        var ctx = try img.getContext();
+        defer ctx.deinit();
+
+        ctx.setFillColor(.{ 255, 150, 0, 1 });
+        ctx.putImage(bitmap.bitmap, bitmap.width, bitmap.height, 0, 0);
+        try ctx.flush();
         try wm.flush();
     }
 
-    // render text to get size
-    var mouse_pos_bitmap = try textz.render(allocator, fonts, "00000x00000");
-    defer mouse_pos_bitmap.deinit();
-
-    var mouse_pos_img = try canvas.createImage(
-        .{
-            .x = 0,
-            .y = 0,
-            .height = mouse_pos_bitmap.height,
-            .width = mouse_pos_bitmap.width,
-        },
-    );
+    // mouse position overlay
+    var mouse_pos_img = try canvas.createImage(.{
+        .x = 0,
+        .y = 0,
+        .height = 16,
+        .width = 120,
+    });
+    var mouse_ctx = try mouse_pos_img.getContext();
+    defer mouse_ctx.deinit();
+    mouse_ctx.setFillColor(.{ 255, 150, 0, 1 });
 
     // set window icon from PBM z image
     {
@@ -127,24 +125,17 @@ pub fn main() !void {
                 log.debug("{any}", .{event});
             },
             .mouse_moved => |move| {
-                // fmt text
-                const mouse_pos_txt2 = try std.fmt.allocPrint(allocator, "{d:5}x{d:5}", .{ move.x, move.y });
-                defer allocator.free(mouse_pos_txt2);
+                const mouse_pos_txt = try std.fmt.allocPrint(allocator, "{d:5}x{d:5}", .{ move.x, move.y });
+                defer allocator.free(mouse_pos_txt);
 
-                // render text
-                var mouse_pos_bitmap2 = try textz.render(allocator, fonts, mouse_pos_txt2);
-                defer mouse_pos_bitmap2.deinit();
-
-                var pixel_reader2 = try mouse_pos_bitmap2.pixelReader(&[_]u8{ 255, 150, 0, 1 });
-                defer pixel_reader2.deinit();
-
-                try mouse_pos_img.setPixels(&pixel_reader2.interface);
+                mouse_ctx.clearRect(0, 0, mouse_ctx.width, mouse_ctx.height);
+                mouse_ctx.fillText(fonts, mouse_pos_txt, 0, 0);
+                try mouse_ctx.flush();
                 try wm.flush();
 
-                mouse_pos_img.dst_bbox.x = move.x;
-                mouse_pos_img.dst_bbox.y = move.y;
+                mouse_pos_img.setX(move.x);
+                mouse_pos_img.setY(move.y);
 
-                // ask to redraw everything
                 try window.redraw(.{});
             },
             else => {},

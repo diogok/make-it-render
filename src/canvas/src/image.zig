@@ -1,3 +1,8 @@
+//! A positioned drawable surface within a Canvas.
+//! Wraps a platform image with logical and physical bounding boxes,
+//! handles DPI scaling via nearest-neighbor, and provides a drawing
+//! Context for direct pixel operations.
+
 image: *anywin.Image,
 dst_bbox: anywin.common.BBox,
 
@@ -6,6 +11,7 @@ scaled: bool = false,
 
 allocator: std.mem.Allocator,
 
+/// Set pixel data from an RGBA reader. Applies nearest-neighbor scaling if needed.
 pub fn setPixels(self: *@This(), src_reader: *std.Io.Reader) !void {
     if (!self.scaled) {
         try self.image.setPixels(src_reader);
@@ -30,6 +36,7 @@ pub fn setPixels(self: *@This(), src_reader: *std.Io.Reader) !void {
     }
 }
 
+/// Set the X position in logical coordinates.
 pub fn setX(self: *@This(), x: anywin.common.X) void {
     self.src_bbox.x = x;
     if (self.scaled) {
@@ -39,6 +46,7 @@ pub fn setX(self: *@This(), x: anywin.common.X) void {
     }
 }
 
+/// Set the Y position in logical coordinates.
 pub fn setY(self: *@This(), y: anywin.common.Y) void {
     self.src_bbox.y = y;
     if (self.scaled) {
@@ -48,10 +56,12 @@ pub fn setY(self: *@This(), y: anywin.common.Y) void {
     }
 }
 
+/// Obtain a 2D drawing context for this image.
 pub fn getContext(self: *@This()) !Context {
     return try Context.init(self, self.allocator);
 }
 
+/// Draw this image to the window at its current position.
 pub fn draw(self: *@This()) !void {
     try self.image.draw(.{
         .x = self.dst_bbox.x,

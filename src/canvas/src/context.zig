@@ -1,3 +1,9 @@
+//! 2D drawing context inspired by the HTML5 Canvas API.
+//! Provides immediate-mode drawing into a pixel buffer with fill, stroke,
+//! path operations and text rendering. Obtain a Context from an Image
+//! via `getContext()`, draw into it, then call `flush()` to push the
+//! pixels to the underlying image.
+
 image: *Image,
 pixel_buffer: []u8,
 width: u32,
@@ -21,6 +27,7 @@ const Point = struct {
     y: f32,
 };
 
+/// Create a new drawing context for an image, allocating an RGBA pixel buffer.
 pub fn init(image: *Image, allocator: std.mem.Allocator) !@This() {
     const width: u32 = image.src_bbox.width;
     const height: u32 = image.src_bbox.height;
@@ -37,19 +44,23 @@ pub fn init(image: *Image, allocator: std.mem.Allocator) !@This() {
     };
 }
 
+/// Free the pixel buffer and path storage.
 pub fn deinit(self: *@This()) void {
     self.allocator.free(self.pixel_buffer);
     self.path.deinit(self.allocator);
 }
 
+/// Set the RGBA color used by fill operations.
 pub fn setFillColor(self: *@This(), color: [4]u8) void {
     self.fill_color = color;
 }
 
+/// Set the RGBA color used by stroke operations.
 pub fn setStrokeColor(self: *@This(), color: [4]u8) void {
     self.stroke_color = color;
 }
 
+/// Set the line width in pixels for stroke operations.
 pub fn setLineWidth(self: *@This(), width: u16) void {
     self.line_width = width;
 }
@@ -87,14 +98,17 @@ fn fillRectInternal(self: *@This(), x: i32, y: i32, w: u32, h: u32, color: [4]u8
     }
 }
 
+/// Fill a rectangle with the current fill color.
 pub fn fillRect(self: *@This(), x: i32, y: i32, w: u32, h: u32) void {
     self.fillRectInternal(x, y, w, h, self.fill_color);
 }
 
+/// Clear a rectangle to transparent black.
 pub fn clearRect(self: *@This(), x: i32, y: i32, w: u32, h: u32) void {
     self.fillRectInternal(x, y, w, h, .{ 0, 0, 0, 0 });
 }
 
+/// Draw a rectangle outline with the current stroke color and line width.
 pub fn strokeRect(self: *@This(), x: i32, y: i32, w: u32, h: u32) void {
     const lw = self.line_width;
     const color = self.stroke_color;
@@ -108,18 +122,22 @@ pub fn strokeRect(self: *@This(), x: i32, y: i32, w: u32, h: u32) void {
     self.fillRectInternal(x + @as(i32, @intCast(w)) - @as(i32, lw), y, lw, h, color);
 }
 
+/// Start a new path, discarding any existing path commands.
 pub fn beginPath(self: *@This()) void {
     self.path.clearRetainingCapacity();
 }
 
+/// Move the current point without drawing.
 pub fn moveTo(self: *@This(), x: f32, y: f32) void {
     self.path.append(self.allocator, .{ .move_to = .{ .x = x, .y = y } }) catch {};
 }
 
+/// Add a line segment from the current point to (x, y).
 pub fn lineTo(self: *@This(), x: f32, y: f32) void {
     self.path.append(self.allocator, .{ .line_to = .{ .x = x, .y = y } }) catch {};
 }
 
+/// Close the current path by drawing a line back to the starting point.
 pub fn closePath(self: *@This()) void {
     self.path.append(self.allocator, .close_path) catch {};
 }
@@ -154,6 +172,7 @@ fn drawLine(self: *@This(), x0: i32, y0: i32, x1: i32, y1: i32, color: [4]u8) vo
     }
 }
 
+/// Stroke the current path using Bresenham's line algorithm.
 pub fn stroke(self: *@This()) void {
     const color = self.stroke_color;
     var start: ?Point = null;
@@ -195,12 +214,13 @@ pub fn stroke(self: *@This()) void {
     }
 }
 
+/// Fill the current path using scanline rasterization with even-odd rule.
 pub fn fill(self: *@This()) void {
     const color = self.fill_color;
 
     // Collect edges from path
-    var edges = std.ArrayList(Edge).init(self.allocator);
-    defer edges.deinit();
+    var edges: std.ArrayList(Edge) = .empty;
+    defer edges.deinit(self.allocator);
 
     var start: ?Point = null;
     var current: ?Point = null;
@@ -213,14 +233,14 @@ pub fn fill(self: *@This()) void {
             },
             .line_to => |p| {
                 if (current) |cur| {
-                    addEdge(&edges, cur, p);
+                    addEdge(&edges, self.allocator, cur, p);
                 }
                 current = p;
             },
             .close_path => {
                 if (current) |cur| {
                     if (start) |s| {
-                        addEdge(&edges, cur, s);
+                        addEdge(&edges, self.allocator, cur, s);
                     }
                 }
                 current = start;
@@ -242,8 +262,8 @@ pub fn fill(self: *@This()) void {
     const end_y: i32 = @min(@as(i32, @intCast(self.height)), @as(i32, @intFromFloat(@ceil(max_y))));
 
     // Intersection buffer
-    var intersections = std.ArrayList(f32).init(self.allocator);
-    defer intersections.deinit();
+    var intersections: std.ArrayList(f32) = .empty;
+    defer intersections.deinit(self.allocator);
 
     // Scanline fill
     var y = start_y;
@@ -276,6 +296,26 @@ pub fn fill(self: *@This()) void {
     }
 }
 
+/// Draw a 1-bit bitmap at the given position using the current fill color.
+pub fn putImage(self: *@This(), bitmap: []const u1, bw: u16, bh: u16, x: i32, y: i32) void {
+    for (0..bh) |row| {
+        for (0..bw) |col| {
+            if (bitmap[row * bw + col] == 1) {
+                self.setPixel(x + @as(i32, @intCast(col)), y + @as(i32, @intCast(row)), self.fill_color);
+            }
+        }
+    }
+}
+
+/// Draw text at the given position using the current fill color.
+pub fn fillText(self: *@This(), fonts: []const textz.common.Font, text: []const u8, x: i32, y: i32) void {
+    var bitmap = textz.render(self.allocator, fonts, text) catch return;
+    defer bitmap.deinit();
+
+    self.putImage(bitmap.bitmap, bitmap.width, bitmap.height, x, y);
+}
+
+/// Write the pixel buffer to the underlying image.
 pub fn flush(self: *@This()) !void {
     var reader = std.Io.Reader.fixed(self.pixel_buffer);
     try self.image.setPixels(&reader);
@@ -288,10 +328,10 @@ const Edge = struct {
     y1: f32,
 };
 
-fn addEdge(edges: *std.ArrayList(Edge), p0: Point, p1: Point) void {
+fn addEdge(edges: *std.ArrayList(Edge), allocator: std.mem.Allocator, p0: Point, p1: Point) void {
     // Skip horizontal edges
     if (p0.y == p1.y) return;
-    edges.append(edges.allocator, .{
+    edges.append(allocator, .{
         .x0 = p0.x,
         .y0 = p0.y,
         .x1 = p1.x,
@@ -541,6 +581,7 @@ test "fill triangle" {
         .height = 10,
         .allocator = allocator,
     };
+    defer ctx.path.deinit(allocator);
 
     ctx.setFillColor(.{ 255, 0, 0, 255 });
     ctx.moveTo(5, 1);
@@ -572,6 +613,7 @@ test "stroke path" {
         .height = 5,
         .allocator = allocator,
     };
+    defer ctx.path.deinit(allocator);
 
     ctx.setStrokeColor(.{ 0, 255, 0, 255 });
     ctx.moveTo(0, 0);
@@ -590,5 +632,6 @@ test "stroke path" {
 
 const std = @import("std");
 const anywin = @import("anywindow");
+const textz = @import("text");
 const Image = @import("image.zig");
 const testing = std.testing;
