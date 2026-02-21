@@ -27,8 +27,8 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/root.zig"),
         }),
     });
-    tests.root_module.addImport("anywindow",anywindow.module("anywindow") );
-    tests.root_module.addImport("text",text.module("text") );
+    tests.root_module.addImport("anywindow", anywindow.module("anywindow"));
+    tests.root_module.addImport("text", text.module("text"));
 
     const run_tests = b.addRunArtifact(tests);
     const run_tests_step = b.step("test", "Run tests");

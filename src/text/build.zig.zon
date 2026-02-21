@@ -2,8 +2,7 @@
     .name = .text,
     .fingerprint = 0x3b8ba7c738390150,
     .version = "0.0.0",
-    .dependencies = .{
-    },
+    .dependencies = .{},
     .paths = .{
         "buid.zig",
         "build.zig.zon",

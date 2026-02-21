@@ -8,18 +8,18 @@ pub fn build(b: *std.Build) void {
         "text",
         .{
             .root_source_file = b.path("macos.zig"),
-                    .target = target,
-                    .optimize = optimize,
-                    .strip = optimize == .ReleaseSmall,
+            .target = target,
+            .optimize = optimize,
+            .strip = optimize == .ReleaseSmall,
         },
     );
 
     {
         const demo_mod = b.addModule("demo", .{
             .root_source_file = b.path("demo.zig"),
-                                     .target = target,
-                                     .optimize = optimize,
-                                     .strip = optimize == .ReleaseSmall,
+            .target = target,
+            .optimize = optimize,
+            .strip = optimize == .ReleaseSmall,
         });
         demo_mod.addImport("macos", macos);
 

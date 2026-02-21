@@ -161,9 +161,9 @@ test "rgbaToZPixmap swaps R and B channels" {
 
     // RGBA pixels: Red, Green, Blue, White
     var pixels = [_]u8{
-        255, 0,   0,   255, // Red (R=255, G=0, B=0, A=255)
-        0,   255, 0,   255, // Green (R=0, G=255, B=0, A=255)
-        0,   0,   255, 255, // Blue (R=0, G=0, B=255, A=255)
+        255, 0, 0, 255, // Red (R=255, G=0, B=0, A=255)
+        0, 255, 0, 255, // Green (R=0, G=255, B=0, A=255)
+        0, 0, 255, 255, // Blue (R=0, G=0, B=255, A=255)
         255, 255, 255, 255, // White (R=255, G=255, B=255, A=255)
     };
 
@@ -171,9 +171,9 @@ test "rgbaToZPixmap swaps R and B channels" {
 
     // Expected: BGRA format with alpha zeroed
     const expected = [_]u8{
-        0,   0,   255, 0, // Red becomes (B=0, G=0, R=255, A=0)
-        0,   255, 0,   0, // Green stays (B=0, G=255, R=0, A=0)
-        255, 0,   0,   0, // Blue becomes (B=255, G=0, R=0, A=0)
+        0, 0, 255, 0, // Red becomes (B=0, G=0, R=255, A=0)
+        0, 255, 0, 0, // Green stays (B=0, G=255, R=0, A=0)
+        255, 0, 0, 0, // Blue becomes (B=255, G=0, R=0, A=0)
         255, 255, 255, 0, // White (B=255, G=255, R=255, A=0)
     };
 

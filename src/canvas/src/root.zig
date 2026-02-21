@@ -1,9 +1,9 @@
-
-const canvaz = @import("canvas.zig");
-
-pub const Canvas = canvaz.Canvas;
-pub const Image = canvaz.Image;
+pub const Canvas = @import("canvas.zig");
+pub const Image = @import("image.zig");
+pub const Context = @import("context.zig");
 
 test {
-    _ = canvaz;
+    _ = Canvas;
+    _ = Image;
+    _ = Context;
 }

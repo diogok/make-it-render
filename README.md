@@ -23,7 +23,7 @@ It is an experimental project with constant changes.
 
 ## Structure
 
-Each module is independent and usable by itself. The glue module ties them together.
+Each module is independent and usable by itself.
 
 - **anywindow** — Window handling abstraction
 	- x11: native X11 protocol implementation (no Xlib)
@@ -34,8 +34,8 @@ Each module is independent and usable by itself. The glue module ties them toget
 	- bdf: BDF font format parser (with gzip support)
 - **image** — Image loading
 	- pbm: PBM format (P1 ASCII and P4 binary)
-- **glue.zig** — Joins everything
-	- canvas: infinite drawing canvas with z-order
+- **canvas** — Drawing and bitmap
+	- canvas: infinite drawing area with z-order
 	- image: nearest-neighbor scaling
 
 ## Work in progress
@@ -86,7 +86,7 @@ pub fn main() !void {
     var window = try wm.createWindow(.{ .title = "hello, world." });
     defer window.deinit();
 
-    var canvas = make_it_render.glue.Canvas.init(allocator, &window);
+    var canvas = make_it_render.canvas.Canvas.init(allocator, &window);
     defer canvas.deinit();
 
     try window.show();

@@ -22,7 +22,7 @@ pub fn main() !void {
     defer freeFonts(allocator, fonts);
     log.debug("Time to load fonts: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
-    var canvas = canvaz.Canvas.init(allocator, &window);
+    var canvas: Canvas = .init(allocator, &window);
     defer canvas.deinit();
 
     // let's draw Welcomes
@@ -35,7 +35,7 @@ pub fn main() !void {
         defer pixel_reader.deinit();
 
         // create the image for each
-        var img = try canvas.createImageScaled(
+        var img = try canvas.createImage(
             .{
                 .height = text.height,
                 .width = text.width,
@@ -50,13 +50,13 @@ pub fn main() !void {
     // render PBM image
     {
         var z_reader = std.Io.Reader.fixed(z);
-        var bitmap = try make_it_render.image.parse(allocator,&z_reader );
+        var bitmap = try make_it_render.image.parse(allocator, &z_reader);
         defer bitmap.deinit();
 
         var pixel_reader = try bitmap.pixelReader(&[_]u8{ 255, 150, 0, 1 });
         defer pixel_reader.deinit();
 
-        var img = try canvas.createImageScaled(.{
+        var img = try canvas.createImage(.{
             .width = bitmap.width,
             .height = bitmap.height,
             .x = 50,
@@ -70,7 +70,7 @@ pub fn main() !void {
     var mouse_pos_bitmap = try textz.render(allocator, fonts, "00000x00000");
     defer mouse_pos_bitmap.deinit();
 
-    var mouse_pos_img = try canvas.createImageScaled(
+    var mouse_pos_img = try canvas.createImage(
         .{
             .x = 0,
             .y = 0,
@@ -82,7 +82,7 @@ pub fn main() !void {
     // set window icon from PBM z image
     {
         var z_reader = std.Io.Reader.fixed(z);
-        var icon_bitmap = try make_it_render.image.parse(allocator,&z_reader);
+        var icon_bitmap = try make_it_render.image.parse(allocator, &z_reader);
         defer icon_bitmap.deinit();
 
         var icon_reader = try icon_bitmap.pixelReader(&[_]u8{ 255, 150, 0, 255 });
@@ -191,7 +191,7 @@ const make_it_render = @import("make_it_render");
 
 const anywin = make_it_render.anywindow;
 const textz = make_it_render.text;
-const canvaz = make_it_render.canvas;
+const Canvas = make_it_render.canvas.Canvas;
 
 const log = std.log.scoped(.demo);
 
