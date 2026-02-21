@@ -7,13 +7,16 @@ image: *anywin.Image,
 dst_bbox: anywin.common.BBox,
 
 src_bbox: anywin.common.BBox,
-scaled: bool = false,
+scaling: f32 = 1.0,
+dirty: bool = true,
+z_index: i32 = 0,
 
 allocator: std.mem.Allocator,
 
 /// Set pixel data from an RGBA reader. Applies nearest-neighbor scaling if needed.
 pub fn setPixels(self: *@This(), src_reader: *std.Io.Reader) !void {
-    if (!self.scaled) {
+    self.dirty = true;
+    if (self.scaling == 1.0) {
         try self.image.setPixels(src_reader);
     } else {
         var allocating = std.Io.Writer.Allocating.init(self.allocator);
@@ -39,26 +42,37 @@ pub fn setPixels(self: *@This(), src_reader: *std.Io.Reader) !void {
 /// Set the X position in logical coordinates.
 pub fn setX(self: *@This(), x: anywin.common.X) void {
     self.src_bbox.x = x;
-    if (self.scaled) {
-        self.dst_bbox.x = @intFromFloat(@as(f32, @floatFromInt(x)) * self.image.window.scaling);
-    } else {
-        self.dst_bbox.x = x;
-    }
+    self.dst_bbox.x = if (self.scaling != 1.0) @intFromFloat(@as(f32, @floatFromInt(x)) * self.scaling) else x;
+    self.dirty = true;
 }
 
 /// Set the Y position in logical coordinates.
 pub fn setY(self: *@This(), y: anywin.common.Y) void {
     self.src_bbox.y = y;
-    if (self.scaled) {
-        self.dst_bbox.y = @intFromFloat(@as(f32, @floatFromInt(y)) * self.image.window.scaling);
-    } else {
-        self.dst_bbox.y = y;
-    }
+    self.dst_bbox.y = if (self.scaling != 1.0) @intFromFloat(@as(f32, @floatFromInt(y)) * self.scaling) else y;
+    self.dirty = true;
+}
+
+/// Set the z-ordering index. Higher values draw on top.
+pub fn setZIndex(self: *@This(), z: i32) void {
+    self.z_index = z;
+    self.dirty = true;
 }
 
 /// Obtain a 2D drawing context for this image.
 pub fn getContext(self: *@This()) !Context {
-    return try Context.init(self, self.allocator);
+    const Self = @This();
+    const flush_target = Context.FlushTarget{
+        .ptr = self,
+        .flushFn = struct {
+            fn f(ptr: *anyopaque, pixels: []const u8) anyerror!void {
+                const img: *Self = @ptrCast(@alignCast(ptr));
+                var reader = std.Io.Reader.fixed(pixels);
+                try img.setPixels(&reader);
+            }
+        }.f,
+    };
+    return try Context.init(flush_target, self.src_bbox.width, self.src_bbox.height, self.allocator);
 }
 
 /// Draw this image to the window at its current position.
@@ -69,6 +83,7 @@ pub fn draw(self: *@This()) !void {
         .width = self.dst_bbox.width,
         .height = self.dst_bbox.height,
     });
+    self.dirty = false;
 }
 
 fn nearestNeighbor(

@@ -4,7 +4,18 @@
 //! via `getContext()`, draw into it, then call `flush()` to push the
 //! pixels to the underlying image.
 
-image: *Image,
+/// Type-erased flush target. Holds a pointer to the destination surface
+/// and a function that writes an RGBA pixel buffer into it.
+pub const FlushTarget = struct {
+    ptr: *anyopaque,
+    flushFn: *const fn (*anyopaque, []const u8) anyerror!void,
+
+    pub fn flush(self: @This(), pixels: []const u8) anyerror!void {
+        return self.flushFn(self.ptr, pixels);
+    }
+};
+
+flush_target: FlushTarget,
 pixel_buffer: []u8,
 width: u32,
 height: u32,
@@ -27,16 +38,15 @@ const Point = struct {
     y: f32,
 };
 
-/// Create a new drawing context for an image, allocating an RGBA pixel buffer.
-pub fn init(image: *Image, allocator: std.mem.Allocator) !@This() {
-    const width: u32 = image.src_bbox.width;
-    const height: u32 = image.src_bbox.height;
+/// Create a new drawing context, allocating an RGBA pixel buffer.
+/// `flush_target` is called by `flush()` to push the buffer to its destination.
+pub fn init(flush_target: FlushTarget, width: u32, height: u32, allocator: std.mem.Allocator) !@This() {
     const size = width * height * 4;
     const pixel_buffer = try allocator.alloc(u8, size);
     @memset(pixel_buffer, 0);
 
     return .{
-        .image = image,
+        .flush_target = flush_target,
         .pixel_buffer = pixel_buffer,
         .width = width,
         .height = height,
@@ -121,15 +131,9 @@ fn fillRectInternal(self: *@This(), x: i32, y: i32, w: u32, h: u32, color: [4]u8
 
     var cy = y0;
     while (cy < y1) : (cy += 1) {
-        const row_start = (cy * self.width + x0) * 4;
-        const row_end = (cy * self.width + x1) * 4;
-        var row = self.pixel_buffer[row_start..row_end];
-        var i: usize = 0;
-        while (i < row.len) : (i += 4) {
-            row[i] = color[0];
-            row[i + 1] = color[1];
-            row[i + 2] = color[2];
-            row[i + 3] = color[3];
+        var cx = x0;
+        while (cx < x1) : (cx += 1) {
+            self.setPixel(@intCast(cx), @intCast(cy), color);
         }
     }
 }
@@ -141,7 +145,17 @@ pub fn fillRect(self: *@This(), x: i32, y: i32, w: u32, h: u32) void {
 
 /// Clear a rectangle to transparent black.
 pub fn clearRect(self: *@This(), x: i32, y: i32, w: u32, h: u32) void {
-    self.fillRectInternal(x, y, w, h, .{ 0, 0, 0, 0 });
+    const x0: u32 = if (x < 0) 0 else @intCast(@min(x, @as(i32, @intCast(self.width))));
+    const y0: u32 = if (y < 0) 0 else @intCast(@min(y, @as(i32, @intCast(self.height))));
+    const x1: u32 = if (x < 0) @min(w -| @as(u32, @intCast(-x)), self.width) else @min(x0 + w, self.width);
+    const y1: u32 = if (y < 0) @min(h -| @as(u32, @intCast(-y)), self.height) else @min(y0 + h, self.height);
+
+    var cy = y0;
+    while (cy < y1) : (cy += 1) {
+        const row_start = (cy * self.width + x0) * 4;
+        const row_end = (cy * self.width + x1) * 4;
+        @memset(self.pixel_buffer[row_start..row_end], 0);
+    }
 }
 
 /// Draw a rectangle outline with the current stroke color and line width.
@@ -332,6 +346,21 @@ pub fn fill(self: *@This()) void {
     }
 }
 
+/// Draw an RGBA pixel buffer at the given position.
+/// Pixels are composited using source-over alpha blending via setPixel.
+pub fn drawImage(self: *@This(), pixels: []const u8, width: u16, height: u16, x: i32, y: i32) void {
+    for (0..height) |row| {
+        for (0..width) |col| {
+            const i = (row * width + col) * 4;
+            self.setPixel(
+                x + @as(i32, @intCast(col)),
+                y + @as(i32, @intCast(row)),
+                .{ pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3] },
+            );
+        }
+    }
+}
+
 /// Draw a 1-bit bitmap at the given position using the current fill color.
 pub fn putImage(self: *@This(), bitmap: []const u1, bw: u16, bh: u16, x: i32, y: i32) void {
     for (0..bh) |row| {
@@ -341,6 +370,11 @@ pub fn putImage(self: *@This(), bitmap: []const u1, bw: u16, bh: u16, x: i32, y:
             }
         }
     }
+}
+
+/// Measure text dimensions without rendering.
+pub fn measureText(_: *@This(), fonts: []const textz.common.Font, text: []const u8) textz.text.TextMetrics {
+    return textz.measure(fonts, text);
 }
 
 /// Draw text at the given position using the current fill color.
@@ -353,8 +387,7 @@ pub fn fillText(self: *@This(), fonts: []const textz.common.Font, text: []const 
 
 /// Write the pixel buffer to the underlying image.
 pub fn flush(self: *@This()) !void {
-    var reader = std.Io.Reader.fixed(self.pixel_buffer);
-    try self.image.setPixels(&reader);
+    try self.flush_target.flush(self.pixel_buffer);
 }
 
 const Edge = struct {
@@ -384,7 +417,7 @@ test "setPixel within bounds" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 4,
         .height = 4,
@@ -406,7 +439,7 @@ test "setPixel out of bounds is ignored" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 2,
         .height = 2,
@@ -431,7 +464,7 @@ test "fillRect fills correct region" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 4,
         .height = 4,
@@ -461,7 +494,7 @@ test "fillRect clips to bounds" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 4,
         .height = 4,
@@ -487,7 +520,7 @@ test "clearRect zeroes region" {
     @memset(buf, 255);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 4,
         .height = 4,
@@ -509,7 +542,7 @@ test "strokeRect draws outline only" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 6,
         .height = 6,
@@ -537,7 +570,7 @@ test "drawLine horizontal" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 5,
         .height = 1,
@@ -562,7 +595,7 @@ test "drawLine vertical" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
         .height = 5,
@@ -585,7 +618,7 @@ test "drawLine diagonal" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 4,
         .height = 4,
@@ -611,7 +644,7 @@ test "fill triangle" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 10,
         .height = 10,
@@ -643,7 +676,7 @@ test "stroke path" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 5,
         .height = 5,
@@ -673,7 +706,7 @@ test "setPixel opaque src over transparent dst" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
         .height = 1,
@@ -691,7 +724,7 @@ test "setPixel opaque src over opaque dst uses fast path" {
     buf[0] = 10; buf[1] = 20; buf[2] = 30; buf[3] = 255;
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
         .height = 1,
@@ -709,7 +742,7 @@ test "setPixel transparent src leaves dst unchanged" {
     buf[0] = 10; buf[1] = 20; buf[2] = 30; buf[3] = 255;
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
         .height = 1,
@@ -728,7 +761,7 @@ test "setPixel 50% alpha red over opaque white gives pinkish result" {
     buf[0] = 255; buf[1] = 255; buf[2] = 255; buf[3] = 255;
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
         .height = 1,
@@ -754,7 +787,7 @@ test "setPixel 50% alpha red over transparent dst" {
     @memset(buf, 0);
 
     var ctx = @This(){
-        .image = undefined,
+        .flush_target = undefined,
         .pixel_buffer = buf,
         .width = 1,
         .height = 1,
@@ -772,8 +805,118 @@ test "setPixel 50% alpha red over transparent dst" {
     try testing.expectEqual(@as(u8, 0), buf[2]);
 }
 
+test "drawImage 2x2 opaque red onto transparent buffer" {
+    const allocator = testing.allocator;
+    const buf = try allocator.alloc(u8, 4 * 4 * 4);
+    defer allocator.free(buf);
+    @memset(buf, 0);
+
+    var ctx = @This(){
+        .flush_target = undefined,
+        .pixel_buffer = buf,
+        .width = 4,
+        .height = 4,
+        .allocator = allocator,
+    };
+
+    const pixels = [_]u8{
+        255, 0, 0, 255, 255, 0, 0, 255,
+        255, 0, 0, 255, 255, 0, 0, 255,
+    };
+    ctx.drawImage(&pixels, 2, 2, 1, 1);
+
+    // (1,1) should be red
+    const offset11 = (1 * 4 + 1) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 255, 0, 0, 255 }, buf[offset11 .. offset11 + 4]);
+    // (2,2) should be red
+    const offset22 = (2 * 4 + 2) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 255, 0, 0, 255 }, buf[offset22 .. offset22 + 4]);
+    // (0,0) should be zero
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0, 0 }, buf[0..4]);
+}
+
+test "drawImage 50% alpha over opaque white" {
+    const allocator = testing.allocator;
+    const buf = try allocator.alloc(u8, 1 * 1 * 4);
+    defer allocator.free(buf);
+    buf[0] = 255; buf[1] = 255; buf[2] = 255; buf[3] = 255;
+
+    var ctx = @This(){
+        .flush_target = undefined,
+        .pixel_buffer = buf,
+        .width = 1,
+        .height = 1,
+        .allocator = allocator,
+    };
+
+    const pixels = [_]u8{ 255, 0, 0, 128 };
+    ctx.drawImage(&pixels, 1, 1, 0, 0);
+
+    try testing.expectEqual(@as(u8, 255), buf[3]);
+    try testing.expectEqual(@as(u8, 255), buf[0]);
+    try testing.expect(buf[1] >= 126 and buf[1] <= 128);
+    try testing.expect(buf[2] >= 126 and buf[2] <= 128);
+}
+
+test "drawImage at negative offset clips without crash" {
+    const allocator = testing.allocator;
+    const buf = try allocator.alloc(u8, 2 * 2 * 4);
+    defer allocator.free(buf);
+    @memset(buf, 0);
+
+    var ctx = @This(){
+        .flush_target = undefined,
+        .pixel_buffer = buf,
+        .width = 2,
+        .height = 2,
+        .allocator = allocator,
+    };
+
+    const pixels = [_]u8{
+        0, 255, 0, 255, 0, 255, 0, 255,
+        0, 255, 0, 255, 0, 255, 0, 255,
+    };
+    ctx.drawImage(&pixels, 2, 2, -1, -1);
+
+    // Only (0,0) should have the bottom-right pixel of the image
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 255, 0, 255 }, buf[0..4]);
+    // (1,0) should be zero
+    const offset10 = (0 * 2 + 1) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0, 0 }, buf[offset10 .. offset10 + 4]);
+}
+
+test "drawImage larger than canvas clips without crash" {
+    const allocator = testing.allocator;
+    const buf = try allocator.alloc(u8, 2 * 2 * 4);
+    defer allocator.free(buf);
+    @memset(buf, 0);
+
+    var ctx = @This(){
+        .flush_target = undefined,
+        .pixel_buffer = buf,
+        .width = 2,
+        .height = 2,
+        .allocator = allocator,
+    };
+
+    const pixels = [_]u8{
+        255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255,
+        255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255,
+        255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255,
+    };
+    ctx.drawImage(&pixels, 3, 3, 0, 0);
+
+    // (0,0) should be red
+    try testing.expectEqualSlices(u8, &[_]u8{ 255, 0, 0, 255 }, buf[0..4]);
+    // (1,0) should be green
+    const offset10 = (0 * 2 + 1) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 255, 0, 255 }, buf[offset10 .. offset10 + 4]);
+    // (1,1) should be green
+    const offset11 = (1 * 2 + 1) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 255, 0, 255 }, buf[offset11 .. offset11 + 4]);
+}
+
 const std = @import("std");
 const anywin = @import("anywindow");
 const textz = @import("text");
-const Image = @import("image.zig");
 const testing = std.testing;

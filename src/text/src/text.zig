@@ -1,19 +1,29 @@
-pub fn render(
-    allocator: std.mem.Allocator,
-    fonts: []const common.Font,
-    text: []const u8,
-) !common.Bitmap {
+pub const TextMetrics = struct {
+    width: u16,
+    height: u16,
+};
+
+pub fn measure(fonts: []const common.Font, text: []const u8) TextMetrics {
     var width: u16 = 0;
     var height: u16 = 0;
     var iter = std.unicode.Utf8Iterator{ .bytes = text, .i = 0 };
-
-    // iterate to get the size of the text
     while (iter.nextCodepoint()) |char| {
         const glyph = findGlyph(fonts, char);
         width += glyph.advance;
         height = @max(height, glyph.bbox.height);
     }
-    iter.i = 0;
+    return .{ .width = width, .height = height };
+}
+
+pub fn render(
+    allocator: std.mem.Allocator,
+    fonts: []const common.Font,
+    text: []const u8,
+) !common.Bitmap {
+    const metrics = measure(fonts, text);
+    const width = metrics.width;
+    const height = metrics.height;
+    var iter = std.unicode.Utf8Iterator{ .bytes = text, .i = 0 };
 
     const bitmap = try allocator.alloc(u1, width * height);
     @memset(bitmap, 0);
@@ -76,6 +86,24 @@ test "Render a short phrase" {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, x, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 720..767
     };
     try testing.expectEqualSlices(u1, expected, result.bitmap);
+}
+
+test "measure returns correct dimensions" {
+    const uni = try @import("fonts/unifont/unifont.zig").unifont(testing.allocator);
+    defer uni.deinit();
+
+    const metrics = measure(&[_]common.Font{uni}, "I, am!");
+    try testing.expectEqual(@as(u16, 48), metrics.width);
+    try testing.expectEqual(@as(u16, 16), metrics.height);
+}
+
+test "measure empty string returns zero" {
+    const uni = try @import("fonts/unifont/unifont.zig").unifont(testing.allocator);
+    defer uni.deinit();
+
+    const metrics = measure(&[_]common.Font{uni}, "");
+    try testing.expectEqual(@as(u16, 0), metrics.width);
+    try testing.expectEqual(@as(u16, 0), metrics.height);
 }
 
 fn findGlyph(fonts: []const common.Font, codepoint: u21) common.Glyph {

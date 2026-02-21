@@ -13,6 +13,7 @@ pub fn init(allocator: std.mem.Allocator, window: *anywin.Window) @This() {
 
 pub fn deinit(self: *@This()) void {
     for (self.images.items) |image| {
+        image.image.deinit();
         self.allocator.destroy(image.image);
         self.allocator.destroy(image);
     }
@@ -26,12 +27,11 @@ pub fn createImage(self: *@This(), bbox: anywin.common.BBox) !*Image {
     errdefer self.allocator.destroy(img);
 
     const scaling = self.window.scaling;
-    const scaled = scaling != 1.0;
 
-    const width: u16 = if (scaled) @intFromFloat(@as(f16, @floatFromInt(bbox.width)) * scaling) else bbox.width;
-    const height: u16 = if (scaled) @intFromFloat(@as(f16, @floatFromInt(bbox.height)) * scaling) else bbox.height;
-    const x: i16 = if (scaled) @intFromFloat(@as(f16, @floatFromInt(bbox.x)) * scaling) else bbox.x;
-    const y: i16 = if (scaled) @intFromFloat(@as(f16, @floatFromInt(bbox.y)) * scaling) else bbox.y;
+    const width: u16 = if (scaling != 1.0) @intFromFloat(@as(f16, @floatFromInt(bbox.width)) * scaling) else bbox.width;
+    const height: u16 = if (scaling != 1.0) @intFromFloat(@as(f16, @floatFromInt(bbox.height)) * scaling) else bbox.height;
+    const x: i16 = if (scaling != 1.0) @intFromFloat(@as(f16, @floatFromInt(bbox.x)) * scaling) else bbox.x;
+    const y: i16 = if (scaling != 1.0) @intFromFloat(@as(f16, @floatFromInt(bbox.y)) * scaling) else bbox.y;
 
     img.* = try self.window.createImage(.{ .width = width, .height = height });
     try self.window.wm.flush();
@@ -46,7 +46,7 @@ pub fn createImage(self: *@This(), bbox: anywin.common.BBox) !*Image {
             .x = x,
             .y = y,
         },
-        .scaled = scaled,
+        .scaling = scaling,
         .allocator = self.allocator,
     };
 
@@ -63,16 +63,32 @@ pub fn removeImage(self: *@This(), image: *Image) void {
             break;
         }
     }
+    image.image.deinit();
     self.allocator.destroy(image.image);
     self.allocator.destroy(image);
 }
 
 /// Composite all images onto the window, clearing it first.
+/// Skips the draw if no images are dirty.
 pub fn draw(self: *@This()) !void {
     try self.window.beginDraw();
-    try self.window.clear(.{});
+    var any_dirty = false;
     for (self.images.items) |image| {
-        try image.draw();
+        if (image.dirty) {
+            any_dirty = true;
+            break;
+        }
+    }
+    if (any_dirty) {
+        std.sort.block(*Image, self.images.items, {}, struct {
+            fn lessThan(_: void, a: *Image, b: *Image) bool {
+                return a.z_index < b.z_index;
+            }
+        }.lessThan);
+        try self.window.clear(.{});
+        for (self.images.items) |image| {
+            try image.draw();
+        }
     }
     try self.window.endDraw();
 }

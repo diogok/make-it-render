@@ -39,7 +39,7 @@ pub fn main() !void {
         var ctx = try img.getContext();
         defer ctx.deinit();
 
-        ctx.setFillColor(.{ 255, 150, 0, 1 });
+        ctx.setFillColor(.{ 255, 150, 0, 255 });
         ctx.fillText(fonts, txt, 0, 0);
         try ctx.flush();
         try wm.flush();
@@ -60,7 +60,7 @@ pub fn main() !void {
         var ctx = try img.getContext();
         defer ctx.deinit();
 
-        ctx.setFillColor(.{ 255, 150, 0, 1 });
+        ctx.setFillColor(.{ 255, 150, 0, 255 });
         ctx.putImage(bitmap.bitmap, bitmap.width, bitmap.height, 0, 0);
         try ctx.flush();
         try wm.flush();
@@ -75,7 +75,7 @@ pub fn main() !void {
     });
     var mouse_ctx = try mouse_pos_img.getContext();
     defer mouse_ctx.deinit();
-    mouse_ctx.setFillColor(.{ 255, 150, 0, 1 });
+    mouse_ctx.setFillColor(.{ 255, 150, 0, 255 });
 
     // set window icon from PBM z image
     {
