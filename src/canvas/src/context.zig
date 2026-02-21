@@ -71,10 +71,46 @@ fn setPixel(self: *@This(), x: i32, y: i32, color: [4]u8) void {
     const uy: u32 = @intCast(y);
     if (ux >= self.width or uy >= self.height) return;
     const offset = (uy * self.width + ux) * 4;
-    self.pixel_buffer[offset] = color[0];
-    self.pixel_buffer[offset + 1] = color[1];
-    self.pixel_buffer[offset + 2] = color[2];
-    self.pixel_buffer[offset + 3] = color[3];
+
+    const src_a = color[3];
+
+    // Fast path: fully opaque, just overwrite
+    if (src_a == 255) {
+        self.pixel_buffer[offset]     = color[0];
+        self.pixel_buffer[offset + 1] = color[1];
+        self.pixel_buffer[offset + 2] = color[2];
+        self.pixel_buffer[offset + 3] = 255;
+        return;
+    }
+
+    // Fully transparent: nothing to draw
+    if (src_a == 0) return;
+
+    // Alpha blend: source-over compositing
+    const dst_r: f32 = @floatFromInt(self.pixel_buffer[offset]);
+    const dst_g: f32 = @floatFromInt(self.pixel_buffer[offset + 1]);
+    const dst_b: f32 = @floatFromInt(self.pixel_buffer[offset + 2]);
+    const dst_a: f32 = @floatFromInt(self.pixel_buffer[offset + 3]);
+
+    const src_r: f32 = @floatFromInt(color[0]);
+    const src_g: f32 = @floatFromInt(color[1]);
+    const src_b: f32 = @floatFromInt(color[2]);
+    const sa: f32 = @as(f32, @floatFromInt(src_a)) / 255.0;
+    const da: f32 = dst_a / 255.0;
+
+    const out_a = sa + da * (1.0 - sa);
+    if (out_a == 0.0) {
+        self.pixel_buffer[offset]     = 0;
+        self.pixel_buffer[offset + 1] = 0;
+        self.pixel_buffer[offset + 2] = 0;
+        self.pixel_buffer[offset + 3] = 0;
+        return;
+    }
+
+    self.pixel_buffer[offset]     = @intFromFloat((src_r * sa + dst_r * da * (1.0 - sa)) / out_a);
+    self.pixel_buffer[offset + 1] = @intFromFloat((src_g * sa + dst_g * da * (1.0 - sa)) / out_a);
+    self.pixel_buffer[offset + 2] = @intFromFloat((src_b * sa + dst_b * da * (1.0 - sa)) / out_a);
+    self.pixel_buffer[offset + 3] = @intFromFloat(out_a * 255.0);
 }
 
 fn fillRectInternal(self: *@This(), x: i32, y: i32, w: u32, h: u32, color: [4]u8) void {
@@ -628,6 +664,112 @@ test "stroke path" {
     // second row should be empty
     const offset10 = (1 * 5 + 0) * 4;
     try testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0, 0 }, buf[offset10 .. offset10 + 4]);
+}
+
+test "setPixel opaque src over transparent dst" {
+    const allocator = testing.allocator;
+    const buf = try allocator.alloc(u8, 1 * 1 * 4);
+    defer allocator.free(buf);
+    @memset(buf, 0);
+
+    var ctx = @This(){
+        .image = undefined,
+        .pixel_buffer = buf,
+        .width = 1,
+        .height = 1,
+        .allocator = allocator,
+    };
+
+    ctx.setPixel(0, 0, .{ 200, 100, 50, 255 });
+    try testing.expectEqualSlices(u8, &[_]u8{ 200, 100, 50, 255 }, buf[0..4]);
+}
+
+test "setPixel opaque src over opaque dst uses fast path" {
+    const allocator = testing.allocator;
+    const buf = try allocator.alloc(u8, 1 * 1 * 4);
+    defer allocator.free(buf);
+    buf[0] = 10; buf[1] = 20; buf[2] = 30; buf[3] = 255;
+
+    var ctx = @This(){
+        .image = undefined,
+        .pixel_buffer = buf,
+        .width = 1,
+        .height = 1,
+        .allocator = allocator,
+    };
+
+    ctx.setPixel(0, 0, .{ 200, 100, 50, 255 });
+    try testing.expectEqualSlices(u8, &[_]u8{ 200, 100, 50, 255 }, buf[0..4]);
+}
+
+test "setPixel transparent src leaves dst unchanged" {
+    const allocator = testing.allocator;
+    const buf = try allocator.alloc(u8, 1 * 1 * 4);
+    defer allocator.free(buf);
+    buf[0] = 10; buf[1] = 20; buf[2] = 30; buf[3] = 255;
+
+    var ctx = @This(){
+        .image = undefined,
+        .pixel_buffer = buf,
+        .width = 1,
+        .height = 1,
+        .allocator = allocator,
+    };
+
+    ctx.setPixel(0, 0, .{ 255, 0, 0, 0 });
+    try testing.expectEqualSlices(u8, &[_]u8{ 10, 20, 30, 255 }, buf[0..4]);
+}
+
+test "setPixel 50% alpha red over opaque white gives pinkish result" {
+    const allocator = testing.allocator;
+    const buf = try allocator.alloc(u8, 1 * 1 * 4);
+    defer allocator.free(buf);
+    // white background
+    buf[0] = 255; buf[1] = 255; buf[2] = 255; buf[3] = 255;
+
+    var ctx = @This(){
+        .image = undefined,
+        .pixel_buffer = buf,
+        .width = 1,
+        .height = 1,
+        .allocator = allocator,
+    };
+
+    ctx.setPixel(0, 0, .{ 255, 0, 0, 128 });
+
+    // out_a = 128/255 + 1*(1 - 128/255) = 1.0  → alpha 255
+    try testing.expectEqual(@as(u8, 255), buf[3]);
+    // red channel: (255*(128/255) + 255*1*(1-128/255)) / 1.0 = 255 → 255
+    try testing.expectEqual(@as(u8, 255), buf[0]);
+    // green channel: (0*(128/255) + 255*1*(1-128/255)) / 1.0 ≈ 127
+    try testing.expect(buf[1] >= 126 and buf[1] <= 128);
+    // blue channel same as green
+    try testing.expect(buf[2] >= 126 and buf[2] <= 128);
+}
+
+test "setPixel 50% alpha red over transparent dst" {
+    const allocator = testing.allocator;
+    const buf = try allocator.alloc(u8, 1 * 1 * 4);
+    defer allocator.free(buf);
+    @memset(buf, 0);
+
+    var ctx = @This(){
+        .image = undefined,
+        .pixel_buffer = buf,
+        .width = 1,
+        .height = 1,
+        .allocator = allocator,
+    };
+
+    ctx.setPixel(0, 0, .{ 255, 0, 0, 128 });
+
+    // out_a = 128/255 + 0*(1 - 128/255) = 128/255  → ~128
+    try testing.expect(buf[3] >= 127 and buf[3] <= 129);
+    // out_r = (255*(128/255) + 0) / (128/255) ≈ 255 (f32 rounding may yield 254 or 255)
+    try testing.expect(buf[0] >= 254);
+    // out_g = out_b = 0
+    try testing.expectEqual(@as(u8, 0), buf[1]);
+    try testing.expectEqual(@as(u8, 0), buf[2]);
 }
 
 const std = @import("std");
