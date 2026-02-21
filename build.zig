@@ -26,6 +26,9 @@ pub fn build(b: *std.Build) void {
     const canvas = b.dependency("canvas", .{ .target = target, .optimize = optimize });
     make_it_render.addImport("canvas", canvas.module("canvas"));
 
+    const loop = b.dependency("loop", .{ .target = target, .optimize = optimize });
+    make_it_render.addImport("loop", loop.module("loop"));
+
     {
         const demo_mod = b.addModule("demo", .{
             .root_source_file = b.path("src/demo.zig"),
@@ -58,6 +61,7 @@ pub fn build(b: *std.Build) void {
         tests_mod.addImport("text", text.module("text"));
         tests_mod.addImport("image", image.module("image"));
         tests_mod.addImport("canvas", canvas.module("canvas"));
+        tests_mod.addImport("loop", loop.module("loop"));
 
         const tests = b.addTest(.{
             .root_module = tests_mod,

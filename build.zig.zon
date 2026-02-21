@@ -15,6 +15,9 @@
         .canvas = .{
             .path = "src/canvas",
         },
+        .loop = .{
+            .path = "src/loop",
+        },
     },
     .paths = .{
         "src",

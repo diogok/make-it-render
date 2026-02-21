@@ -101,47 +101,76 @@ pub fn main() !void {
     // show the window now that we have all ready
     try window.show();
 
-    while (window.status == .open) {
-        const event = try wm.receive();
-        switch (event) {
-            .close => {
-                window.close();
-            },
-            .draw => {
-                timer.reset();
+    var window_source: WindowSource = .{ .wm = &wm };
+    var ev_loop = eventLoop(.{ .window = &window_source });
+    defer ev_loop.deinit();
+    try ev_loop.start();
 
-                try canvas.draw();
+    while (ev_loop.receive()) |wrapped| {
+        switch (wrapped) {
+            .window => |event| switch (event) {
+                .close => {
+                    window.close();
+                    ev_loop.stop();
+                },
+                .draw => {
+                    timer.reset();
 
-                log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.ns_per_ms});
-            },
-            .key_pressed => |key_event| {
-                if (key_event.key == .f) {
-                    window.toggleFullscreen();
+                    try canvas.draw();
+
+                    log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.ns_per_ms});
+                },
+                .key_pressed => |key_event| {
+                    if (key_event.key == .f) {
+                        window.toggleFullscreen();
+                        try window.redraw(.{});
+                    }
+                    log.debug("{any}", .{event});
+                },
+                .mouse_pressed, .mouse_released, .key_released => {
+                    log.debug("{any}", .{event});
+                },
+                .mouse_moved => |move| {
+                    const mouse_pos_txt = try std.fmt.allocPrint(allocator, "{d:5}x{d:5}", .{ move.x, move.y });
+                    defer allocator.free(mouse_pos_txt);
+
+                    mouse_ctx.clearRect(0, 0, mouse_ctx.width, mouse_ctx.height);
+                    mouse_ctx.fillText(fonts, mouse_pos_txt, 0, 0);
+                    try mouse_ctx.flush();
+                    try wm.flush();
+
+                    mouse_pos_img.setX(move.x);
+                    mouse_pos_img.setY(move.y);
+
                     try window.redraw(.{});
-                }
-                log.debug("{any}", .{event});
+                },
+                else => {},
             },
-            .mouse_pressed, .mouse_released, .key_released => {
-                log.debug("{any}", .{event});
-            },
-            .mouse_moved => |move| {
-                const mouse_pos_txt = try std.fmt.allocPrint(allocator, "{d:5}x{d:5}", .{ move.x, move.y });
-                defer allocator.free(mouse_pos_txt);
-
-                mouse_ctx.clearRect(0, 0, mouse_ctx.width, mouse_ctx.height);
-                mouse_ctx.fillText(fonts, mouse_pos_txt, 0, 0);
-                try mouse_ctx.flush();
-                try wm.flush();
-
-                mouse_pos_img.setX(move.x);
-                mouse_pos_img.setY(move.y);
-
-                try window.redraw(.{});
-            },
-            else => {},
         }
     }
 }
+
+const WindowSource = struct {
+    wm: *anywin.WindowManager,
+    running: bool = true,
+
+    pub const Event = anywin.common.Event;
+
+    pub fn poll(self: *@This()) ?Event {
+        while (self.running) {
+            const event = self.wm.receive() catch return null;
+            switch (event) {
+                .nop => continue,
+                else => return event,
+            }
+        }
+        return null;
+    }
+
+    pub fn stop(self: *@This()) void {
+        self.running = false;
+    }
+};
 
 fn getFonts(allocator: std.mem.Allocator) ![]const textz.common.Font {
     const terminus = try textz.terminus.terminus(allocator, .@"16", .n);
@@ -183,6 +212,7 @@ const make_it_render = @import("make_it_render");
 const anywin = make_it_render.anywindow;
 const textz = make_it_render.text;
 const Canvas = make_it_render.canvas.Canvas;
+const eventLoop = make_it_render.loop.eventLoop;
 
 const log = std.log.scoped(.demo);
 

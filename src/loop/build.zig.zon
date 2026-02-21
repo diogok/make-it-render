@@ -1,0 +1,11 @@
+.{
+    .name = .loop,
+    .fingerprint = 0xa15f1dee1edcad55,
+    .version = "0.0.0",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
