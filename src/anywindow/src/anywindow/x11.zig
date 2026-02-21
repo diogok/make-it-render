@@ -55,7 +55,12 @@ pub const WindowManager = struct {
             .first_keycode = min_kc,
             .count = kc_count,
         });
-        const kb_reply = try x11.receiveReply(conn, x11.proto.GetKeyboardMappingReply);
+
+        var reply_buffer: [32]u8 = undefined;
+        var conn_reader = conn.reader(&reply_buffer);
+        var reader = conn_reader.interface();
+
+        const kb_reply = try x11.utils.readReply(reader, x11.proto.GetKeyboardMappingReply);
 
         var keysyms_per_keycode: u8 = 0;
         var keysym_map: []u32 = &[_]u32{};
@@ -67,12 +72,7 @@ pub const WindowManager = struct {
             errdefer allocator.free(keysym_map);
 
             const keysym_bytes = std.mem.sliceAsBytes(keysym_map);
-            var bytes_read: usize = 0;
-            while (bytes_read < keysym_bytes.len) {
-                const n = try conn.read(keysym_bytes[bytes_read..]);
-                if (n == 0) return error.ConnectionClosed;
-                bytes_read += n;
-            }
+            try reader.readSliceAll(keysym_bytes);
         }
 
         return @This(){
