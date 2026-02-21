@@ -10,7 +10,10 @@ It is an experimental project with constant changes.
 - Window management, keyboard and mouse input events
 - Text rendering with Unicode support (embedded Terminus and Unifont fonts)
 - Image loading (PBM format) and scaling
-- A Canvas to put pixels on
+- 2D drawing Context inspired by HTML5 Canvas API (paths, fills, strokes, text)
+- Alpha blending (source-over compositing)
+- Generic event loop with comptime union generation and thread-per-source polling
+- Fullscreen toggle and window icon support
 - Pure Zig — only uses C when linking to Win32 required libraries
 - Produces small and performant statically-linked binaries
 - No dependencies, all in one
@@ -34,9 +37,13 @@ Each module is independent and usable by itself.
 	- bdf: BDF font format parser (with gzip support)
 - **image** — Image loading
 	- pbm: PBM format (P1 ASCII and P4 binary)
-- **canvas** — Drawing and bitmap
-	- canvas: infinite drawing area with z-order
-	- image: nearest-neighbor scaling
+- **canvas** — Drawing and compositing
+	- canvas: layered drawing area with z-order and DPI scaling
+	- image: nearest-neighbor scaling, dirty tracking
+	- context: 2D drawing context with paths, fills, strokes, text, and alpha blending
+- **loop** — Generic event loop
+	- comptime union generation from multiple event sources
+	- thread-per-source polling with thread-safe queue
 
 ## Work in progress
 
@@ -86,17 +93,36 @@ pub fn main() !void {
     var window = try wm.createWindow(.{ .title = "hello, world." });
     defer window.deinit();
 
-    var canvas = make_it_render.canvas.Canvas.init(allocator, &window);
+    var canvas: make_it_render.canvas.Canvas = .init(allocator, &window);
     defer canvas.deinit();
+
+    // create an image layer and draw on it using the 2D context
+    var img = try canvas.createImage(.{ .width = 200, .height = 100, .x = 10, .y = 10 });
+    var ctx = try img.getContext();
+    defer ctx.deinit();
+
+    ctx.setFillColor(.{ 255, 150, 0, 255 });
+    ctx.fillRect(0, 0, 200, 100);
+    try ctx.flush();
 
     try window.show();
 
-    while (window.status == .open) {
-        const event = try wm.receive();
-        switch (event) {
-            .close => window.close(),
-            .draw => try canvas.draw(),
-            else => {},
+    // event loop with thread-per-source polling
+    var window_source: make_it_render.anywindow.WindowSource = .{ .wm = &wm };
+    var ev_loop = make_it_render.loop.eventLoop(.{ .window = &window_source });
+    defer ev_loop.deinit();
+    try ev_loop.start();
+
+    while (ev_loop.receive()) |wrapped| {
+        switch (wrapped) {
+            .window => |event| switch (event) {
+                .close => {
+                    window.close();
+                    ev_loop.stop();
+                },
+                .draw => try canvas.draw(),
+                else => {},
+            },
         }
     }
 }

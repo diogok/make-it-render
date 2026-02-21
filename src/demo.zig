@@ -101,7 +101,7 @@ pub fn main() !void {
     // show the window now that we have all ready
     try window.show();
 
-    var window_source: WindowSource = .{ .wm = &wm };
+    var window_source: anywin.WindowSource = .{ .wm = &wm };
     var ev_loop = eventLoop(.{ .window = &window_source });
     defer ev_loop.deinit();
     try ev_loop.start();
@@ -149,28 +149,6 @@ pub fn main() !void {
         }
     }
 }
-
-const WindowSource = struct {
-    wm: *anywin.WindowManager,
-    running: bool = true,
-
-    pub const Event = anywin.common.Event;
-
-    pub fn poll(self: *@This()) ?Event {
-        while (self.running) {
-            const event = self.wm.receive() catch return null;
-            switch (event) {
-                .nop => continue,
-                else => return event,
-            }
-        }
-        return null;
-    }
-
-    pub fn stop(self: *@This()) void {
-        self.running = false;
-    }
-};
 
 fn getFonts(allocator: std.mem.Allocator) ![]const textz.common.Font {
     const terminus = try textz.terminus.terminus(allocator, .@"16", .n);
