@@ -31,11 +31,34 @@ const PathCommand = union(enum) {
     move_to: Point,
     line_to: Point,
     close_path: void,
+    quad_to: struct { cx: f32, cy: f32, x: f32, y: f32 },
+    bezier_to: struct { c1x: f32, c1y: f32, c2x: f32, c2y: f32, x: f32, y: f32 },
+    arc: struct { cx: f32, cy: f32, r: f32, start: f32, end: f32, ccw: bool },
 };
 
 const Point = struct {
     x: f32,
     y: f32,
+
+    fn lerp(a: Point, b: Point, t: f32) Point {
+        return .{
+            .x = a.x + (b.x - a.x) * t,
+            .y = a.y + (b.y - a.y) * t,
+        };
+    }
+
+    fn distToLine(p: Point, a: Point, b: Point) f32 {
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const len_sq = dx * dx + dy * dy;
+        if (len_sq < 1e-12) {
+            const ex = p.x - a.x;
+            const ey = p.y - a.y;
+            return @sqrt(ex * ex + ey * ey);
+        }
+        const cross = @abs((p.x - a.x) * dy - (p.y - a.y) * dx);
+        return cross / @sqrt(len_sq);
+    }
 };
 
 /// Create a new drawing context, allocating an RGBA pixel buffer.
@@ -192,6 +215,243 @@ pub fn closePath(self: *@This()) void {
     self.path.append(self.allocator, .close_path) catch {};
 }
 
+/// Add a quadratic bezier curve from the current point to (x, y) with control point (cx, cy).
+pub fn quadraticCurveTo(self: *@This(), cx: f32, cy: f32, x: f32, y: f32) void {
+    self.path.append(self.allocator, .{ .quad_to = .{ .cx = cx, .cy = cy, .x = x, .y = y } }) catch {};
+}
+
+/// Add a cubic bezier curve from the current point to (x, y) with control points (c1x, c1y) and (c2x, c2y).
+pub fn bezierCurveTo(self: *@This(), c1x: f32, c1y: f32, c2x: f32, c2y: f32, x: f32, y: f32) void {
+    self.path.append(self.allocator, .{ .bezier_to = .{ .c1x = c1x, .c1y = c1y, .c2x = c2x, .c2y = c2y, .x = x, .y = y } }) catch {};
+}
+
+/// Add an arc to the path. Angles are in radians.
+pub fn arc(self: *@This(), cx: f32, cy: f32, r: f32, start_angle: f32, end_angle: f32, ccw: bool) void {
+    self.path.append(self.allocator, .{ .arc = .{ .cx = cx, .cy = cy, .r = r, .start = start_angle, .end = end_angle, .ccw = ccw } }) catch {};
+}
+
+/// Add an arc between two tangent lines defined by (current→x1,y1) and (x1,y1→x2,y2) with radius r.
+pub fn arcTo(self: *@This(), x1: f32, y1: f32, x2: f32, y2: f32, r: f32) void {
+    // Need current point to compute the tangent arc
+    const cur = self.currentPoint() orelse return;
+
+    // Vectors from x1,y1 to cur and x1,y1 to x2,y2
+    const d1x = cur.x - x1;
+    const d1y = cur.y - y1;
+    const d2x = x2 - x1;
+    const d2y = y2 - y1;
+
+    const len1 = @sqrt(d1x * d1x + d1y * d1y);
+    const len2 = @sqrt(d2x * d2x + d2y * d2y);
+    if (len1 < 1e-6 or len2 < 1e-6) return;
+
+    // Unit vectors
+    const u1x = d1x / len1;
+    const u1y = d1y / len1;
+    const u2x = d2x / len2;
+    const u2y = d2y / len2;
+
+    // Cross product to determine winding
+    const cross = u1x * u2y - u1y * u2x;
+    if (@abs(cross) < 1e-6) {
+        // Lines are parallel, just line to x1,y1
+        self.lineTo(x1, y1);
+        return;
+    }
+
+    // Half-angle between the two vectors
+    const dot = u1x * u2x + u1y * u2y;
+    const half_angle = std.math.acos(std.math.clamp(dot, -1.0, 1.0)) / 2.0;
+    const tan_half = @tan(half_angle);
+    if (@abs(tan_half) < 1e-6) return;
+
+    // Distance from corner to tangent points
+    const dist = r / tan_half;
+
+    // Tangent points
+    const t1x = x1 + u1x * dist;
+    const t1y = y1 + u1y * dist;
+    const t2x = x1 + u2x * dist;
+    const t2y = y1 + u2y * dist;
+
+    // Arc center
+    const ccw = cross > 0;
+    const nx: f32 = if (ccw) -u1y else u1y;
+    const ny: f32 = if (ccw) u1x else -u1x;
+    const acx = t1x + nx * r;
+    const acy = t1y + ny * r;
+
+    // Angles
+    const start_angle = std.math.atan2(t1y - acy, t1x - acx);
+    const end_angle = std.math.atan2(t2y - acy, t2x - acx);
+
+    // Line to the first tangent point, then arc
+    self.lineTo(t1x, t1y);
+    self.arc(acx, acy, r, start_angle, end_angle, ccw);
+}
+
+fn currentPoint(self: *const @This()) ?Point {
+    var cur: ?Point = null;
+    var sub_start: ?Point = null;
+    for (self.path.items) |cmd| {
+        switch (cmd) {
+            .move_to => |p| {
+                cur = p;
+                sub_start = p;
+            },
+            .line_to => |p| cur = p,
+            .quad_to => |q| cur = .{ .x = q.x, .y = q.y },
+            .bezier_to => |b| cur = .{ .x = b.x, .y = b.y },
+            .arc => |a| cur = .{ .x = a.cx + a.r * @cos(a.end), .y = a.cy + a.r * @sin(a.end) },
+            .close_path => cur = sub_start,
+        }
+    }
+    return cur;
+}
+
+const flatten_tolerance = 0.25;
+const flatten_max_depth = 20;
+
+fn flattenPath(self: *const @This()) std.ArrayList(PathCommand) {
+    var out: std.ArrayList(PathCommand) = .empty;
+    var cur: Point = .{ .x = 0, .y = 0 };
+    var sub_start: Point = .{ .x = 0, .y = 0 };
+
+    for (self.path.items) |cmd| {
+        switch (cmd) {
+            .move_to => |p| {
+                out.append(self.allocator, .{ .move_to = p }) catch {};
+                cur = p;
+                sub_start = p;
+            },
+            .line_to => |p| {
+                out.append(self.allocator, .{ .line_to = p }) catch {};
+                cur = p;
+            },
+            .close_path => {
+                out.append(self.allocator, .close_path) catch {};
+                cur = sub_start;
+            },
+            .quad_to => |q| {
+                // Promote quadratic to cubic: CP1 = lerp(start, ctrl, 2/3), CP2 = lerp(end, ctrl, 2/3)
+                const ctrl: Point = .{ .x = q.cx, .y = q.cy };
+                const end: Point = .{ .x = q.x, .y = q.y };
+                const c1 = Point.lerp(cur, ctrl, 2.0 / 3.0);
+                const c2 = Point.lerp(end, ctrl, 2.0 / 3.0);
+                flattenCubic(&out, self.allocator, cur, c1, c2, end, 0);
+                cur = end;
+            },
+            .bezier_to => |b| {
+                const c1: Point = .{ .x = b.c1x, .y = b.c1y };
+                const c2: Point = .{ .x = b.c2x, .y = b.c2y };
+                const end: Point = .{ .x = b.x, .y = b.y };
+                flattenCubic(&out, self.allocator, cur, c1, c2, end, 0);
+                cur = end;
+            },
+            .arc => |a| {
+                cur = flattenArc(&out, self.allocator, a, cur);
+            },
+        }
+    }
+    return out;
+}
+
+fn flattenCubic(out: *std.ArrayList(PathCommand), allocator: std.mem.Allocator, p0: Point, p1: Point, p2: Point, p3: Point, depth: u32) void {
+    if (depth >= flatten_max_depth) {
+        out.append(allocator, .{ .line_to = p3 }) catch {};
+        return;
+    }
+
+    // Flatness test: max distance of control points to the chord
+    const d1 = Point.distToLine(p1, p0, p3);
+    const d2 = Point.distToLine(p2, p0, p3);
+    if (@max(d1, d2) <= flatten_tolerance) {
+        out.append(allocator, .{ .line_to = p3 }) catch {};
+        return;
+    }
+
+    // De Casteljau split at t=0.5
+    const m01 = Point.lerp(p0, p1, 0.5);
+    const m12 = Point.lerp(p1, p2, 0.5);
+    const m23 = Point.lerp(p2, p3, 0.5);
+    const m012 = Point.lerp(m01, m12, 0.5);
+    const m123 = Point.lerp(m12, m23, 0.5);
+    const mid = Point.lerp(m012, m123, 0.5);
+
+    flattenCubic(out, allocator, p0, m01, m012, mid, depth + 1);
+    flattenCubic(out, allocator, mid, m123, m23, p3, depth + 1);
+}
+
+fn flattenArc(out: *std.ArrayList(PathCommand), allocator: std.mem.Allocator, a: anytype, cur: Point) Point {
+    const tau = 2.0 * std.math.pi;
+
+    var sweep = a.end - a.start;
+    if (a.ccw) {
+        if (sweep > 0) sweep -= tau;
+        if (sweep < -tau) sweep = -tau;
+    } else {
+        if (sweep < 0) sweep += tau;
+        if (sweep > tau) sweep = tau;
+    }
+
+    if (@abs(sweep) < 1e-6) return cur;
+
+    // Move/line to arc start point
+    const start_pt: Point = .{
+        .x = a.cx + a.r * @cos(a.start),
+        .y = a.cy + a.r * @sin(a.start),
+    };
+
+    // If current point differs from arc start, line to it
+    const dx = cur.x - start_pt.x;
+    const dy = cur.y - start_pt.y;
+    if (dx * dx + dy * dy > 0.01) {
+        out.append(allocator, .{ .line_to = start_pt }) catch {};
+    }
+
+    // Split into segments of at most tau/16 radians
+    const max_seg = tau / 16.0;
+    const n_segs_f = @ceil(@abs(sweep) / max_seg);
+    const n_segs: u32 = @intFromFloat(@max(1.0, n_segs_f));
+    const seg_angle = sweep / @as(f32, @floatFromInt(n_segs));
+
+    var angle = a.start;
+    var prev: Point = start_pt;
+
+    for (0..n_segs) |_| {
+        const next_angle = angle + seg_angle;
+
+        // Cubic bezier approximation for this arc segment
+        const alpha = 4.0 / 3.0 * @tan(seg_angle / 4.0);
+
+        const cos0 = @cos(angle);
+        const sin0 = @sin(angle);
+        const cos1 = @cos(next_angle);
+        const sin1 = @sin(next_angle);
+
+        const p0 = prev;
+        const p3: Point = .{
+            .x = a.cx + a.r * cos1,
+            .y = a.cy + a.r * sin1,
+        };
+        const c1: Point = .{
+            .x = p0.x + alpha * a.r * (-sin0),
+            .y = p0.y + alpha * a.r * cos0,
+        };
+        const c2: Point = .{
+            .x = p3.x - alpha * a.r * (-sin1),
+            .y = p3.y - alpha * a.r * cos1,
+        };
+
+        flattenCubic(out, allocator, p0, c1, c2, p3, 0);
+
+        prev = p3;
+        angle = next_angle;
+    }
+
+    return prev;
+}
+
 fn drawLine(self: *@This(), x0: i32, y0: i32, x1: i32, y1: i32, color: [4]u8) void {
     const dx: i32 = if (x1 > x0) x1 - x0 else x0 - x1;
     const dy: i32 = -(if (y1 > y0) y1 - y0 else y0 - y1);
@@ -225,10 +485,13 @@ fn drawLine(self: *@This(), x0: i32, y0: i32, x1: i32, y1: i32, color: [4]u8) vo
 /// Stroke the current path using Bresenham's line algorithm.
 pub fn stroke(self: *@This()) void {
     const color = self.stroke_color;
+    var flat = self.flattenPath();
+    defer flat.deinit(self.allocator);
+
     var start: ?Point = null;
     var current: ?Point = null;
 
-    for (self.path.items) |cmd| {
+    for (flat.items) |cmd| {
         switch (cmd) {
             .move_to => |p| {
                 start = p;
@@ -260,6 +523,7 @@ pub fn stroke(self: *@This()) void {
                 }
                 current = start;
             },
+            else => {},
         }
     }
 }
@@ -268,14 +532,17 @@ pub fn stroke(self: *@This()) void {
 pub fn fill(self: *@This()) void {
     const color = self.fill_color;
 
-    // Collect edges from path
+    var flat = self.flattenPath();
+    defer flat.deinit(self.allocator);
+
+    // Collect edges from flattened path
     var edges: std.ArrayList(Edge) = .empty;
     defer edges.deinit(self.allocator);
 
     var start: ?Point = null;
     var current: ?Point = null;
 
-    for (self.path.items) |cmd| {
+    for (flat.items) |cmd| {
         switch (cmd) {
             .move_to => |p| {
                 start = p;
@@ -295,6 +562,7 @@ pub fn fill(self: *@This()) void {
                 }
                 current = start;
             },
+            else => {},
         }
     }
 
@@ -914,6 +1182,161 @@ test "drawImage larger than canvas clips without crash" {
     // (1,1) should be green
     const offset11 = (1 * 2 + 1) * 4;
     try testing.expectEqualSlices(u8, &[_]u8{ 0, 255, 0, 255 }, buf[offset11 .. offset11 + 4]);
+}
+
+test "quadraticCurveTo produces smooth curve" {
+    const allocator = testing.allocator;
+    const buf = try allocator.alloc(u8, 20 * 20 * 4);
+    defer allocator.free(buf);
+    @memset(buf, 0);
+
+    var ctx: @This() = .{
+        .flush_target = undefined,
+        .pixel_buffer = buf,
+        .width = 20,
+        .height = 20,
+        .allocator = allocator,
+    };
+    defer ctx.path.deinit(allocator);
+
+    ctx.setFillColor(.{ 255, 0, 0, 255 });
+    ctx.moveTo(0, 10);
+    ctx.quadraticCurveTo(10, 0, 19, 10);
+    ctx.lineTo(19, 19);
+    ctx.lineTo(0, 19);
+    ctx.closePath();
+    ctx.fill();
+
+    // Interior pixel under the curve should be filled
+    const offset = (15 * 20 + 10) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 255, 0, 0, 255 }, buf[offset .. offset + 4]);
+    // Pixel above the curve peak should be empty
+    const offset_top = (1 * 20 + 10) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0, 0 }, buf[offset_top .. offset_top + 4]);
+}
+
+test "bezierCurveTo S-curve" {
+    const allocator = testing.allocator;
+    const buf = try allocator.alloc(u8, 30 * 20 * 4);
+    defer allocator.free(buf);
+    @memset(buf, 0);
+
+    var ctx: @This() = .{
+        .flush_target = undefined,
+        .pixel_buffer = buf,
+        .width = 30,
+        .height = 20,
+        .allocator = allocator,
+    };
+    defer ctx.path.deinit(allocator);
+
+    ctx.setFillColor(.{ 0, 255, 0, 255 });
+    ctx.moveTo(0, 10);
+    ctx.bezierCurveTo(10, 0, 20, 19, 29, 10);
+    ctx.lineTo(29, 19);
+    ctx.lineTo(0, 19);
+    ctx.closePath();
+    ctx.fill();
+
+    // Bottom center should be filled
+    const offset = (18 * 30 + 15) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 255, 0, 255 }, buf[offset .. offset + 4]);
+}
+
+test "arc draws circle" {
+    const allocator = testing.allocator;
+    const size: u32 = 40;
+    const buf = try allocator.alloc(u8, size * size * 4);
+    defer allocator.free(buf);
+    @memset(buf, 0);
+
+    var ctx: @This() = .{
+        .flush_target = undefined,
+        .pixel_buffer = buf,
+        .width = size,
+        .height = size,
+        .allocator = allocator,
+    };
+    defer ctx.path.deinit(allocator);
+
+    ctx.setFillColor(.{ 0, 0, 255, 255 });
+    ctx.arc(20, 20, 15, 0, 2.0 * std.math.pi, false);
+    ctx.closePath();
+    ctx.fill();
+
+    // Center should be filled
+    const center = (20 * size + 20) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 255, 255 }, buf[center .. center + 4]);
+    // Corner (0,0) should be empty
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0, 0 }, buf[0..4]);
+    // Corner (39,0) should be empty
+    const tr = (0 * size + 39) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0, 0 }, buf[tr .. tr + 4]);
+    // Corner (39,39) should be empty
+    const br = (39 * size + 39) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0, 0 }, buf[br .. br + 4]);
+}
+
+test "arcTo rounded corner" {
+    const allocator = testing.allocator;
+    const size: u32 = 30;
+    const buf = try allocator.alloc(u8, size * size * 4);
+    defer allocator.free(buf);
+    @memset(buf, 0);
+
+    var ctx: @This() = .{
+        .flush_target = undefined,
+        .pixel_buffer = buf,
+        .width = size,
+        .height = size,
+        .allocator = allocator,
+    };
+    defer ctx.path.deinit(allocator);
+
+    ctx.setFillColor(.{ 255, 255, 0, 255 });
+    // Draw a rounded corner: right edge → corner → bottom edge with radius 10
+    ctx.moveTo(25, 0);
+    ctx.lineTo(25, 10);
+    ctx.arcTo(25, 25, 10, 25, 10);
+    ctx.lineTo(0, 25);
+    ctx.lineTo(0, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Interior point should be filled
+    const offset = (5 * size + 5) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 255, 255, 0, 255 }, buf[offset .. offset + 4]);
+}
+
+test "arc partial quarter circle" {
+    const allocator = testing.allocator;
+    const size: u32 = 30;
+    const buf = try allocator.alloc(u8, size * size * 4);
+    defer allocator.free(buf);
+    @memset(buf, 0);
+
+    var ctx: @This() = .{
+        .flush_target = undefined,
+        .pixel_buffer = buf,
+        .width = size,
+        .height = size,
+        .allocator = allocator,
+    };
+    defer ctx.path.deinit(allocator);
+
+    ctx.setFillColor(.{ 255, 0, 255, 255 });
+    // Quarter circle: 0 to pi/2, centered at (15,15), radius 12
+    ctx.moveTo(15, 15);
+    ctx.arc(15, 15, 12, 0, std.math.pi / 2.0, false);
+    ctx.closePath();
+    ctx.fill();
+
+    // Point in the quarter (right-down quadrant) should be filled
+    const offset = (20 * size + 22) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 255, 0, 255, 255 }, buf[offset .. offset + 4]);
+    // Point in the opposite quadrant (left-up) should be empty
+    const offset2 = (5 * size + 5) * 4;
+    try testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0, 0 }, buf[offset2 .. offset2 + 4]);
 }
 
 const std = @import("std");
