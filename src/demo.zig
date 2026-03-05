@@ -101,7 +101,7 @@ pub fn main() !void {
     // show the window now that we have all ready
     try window.show();
 
-    var window_source: anywin.WindowSource = .{ .wm = &wm };
+    var window_source: anywin.EventSource = .{ .wm = &wm };
     var ev_loop = eventLoop(.{ .window = &window_source });
     defer ev_loop.deinit();
     try ev_loop.start();

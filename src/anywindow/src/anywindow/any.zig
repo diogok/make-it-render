@@ -16,6 +16,30 @@ pub const Image = switch (builtin.os.tag) {
     else => @compileError("platform not supported"),
 };
 
+/// Event source adapter for use with the generic event loop.
+/// Wraps a WindowManager to conform to the poll/stop interface.
+pub const EventSource = struct{
+    wm: *WindowManager,
+    running: bool = true,
+
+    pub const Event = common.Event;
+
+    pub fn poll(self: *@This()) ?common.Event {
+        while (self.running) {
+            const event = self.wm.receive() catch return null;
+            switch (event) {
+                .nop => continue,
+                else => return event,
+            }
+        }
+        return null;
+    }
+
+    pub fn stop(self: *@This()) void {
+        self.running = false;
+    }
+};
+
 test "init" {
     var wm = WindowManager.init(testing.allocator) catch |err| switch (err) {
         error.WouldBlock, error.ConnectionRefused, error.FileNotFound => return,
@@ -31,3 +55,5 @@ const builtin = @import("builtin");
 
 const x11 = @import("x11.zig");
 const windows = @import("windows.zig");
+
+const common = @import("common.zig");
