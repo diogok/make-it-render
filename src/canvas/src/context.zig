@@ -51,7 +51,7 @@ const Point = struct {
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const len_sq = dx * dx + dy * dy;
-        if (len_sq < 1e-12) {
+        if (len_sq < epsilon_sq) {
             const ex = p.x - a.x;
             const ey = p.y - a.y;
             return @sqrt(ex * ex + ey * ey);
@@ -109,7 +109,7 @@ fn setPixel(self: *@This(), x: i32, y: i32, color: [4]u8) void {
 
     // Fast path: fully opaque, just overwrite
     if (src_a == 255) {
-        self.pixel_buffer[offset]     = color[0];
+        self.pixel_buffer[offset] = color[0];
         self.pixel_buffer[offset + 1] = color[1];
         self.pixel_buffer[offset + 2] = color[2];
         self.pixel_buffer[offset + 3] = 255;
@@ -133,14 +133,14 @@ fn setPixel(self: *@This(), x: i32, y: i32, color: [4]u8) void {
 
     const out_a = sa + da * (1.0 - sa);
     if (out_a == 0.0) {
-        self.pixel_buffer[offset]     = 0;
+        self.pixel_buffer[offset] = 0;
         self.pixel_buffer[offset + 1] = 0;
         self.pixel_buffer[offset + 2] = 0;
         self.pixel_buffer[offset + 3] = 0;
         return;
     }
 
-    self.pixel_buffer[offset]     = @intFromFloat((src_r * sa + dst_r * da * (1.0 - sa)) / out_a);
+    self.pixel_buffer[offset] = @intFromFloat((src_r * sa + dst_r * da * (1.0 - sa)) / out_a);
     self.pixel_buffer[offset + 1] = @intFromFloat((src_g * sa + dst_g * da * (1.0 - sa)) / out_a);
     self.pixel_buffer[offset + 2] = @intFromFloat((src_b * sa + dst_b * da * (1.0 - sa)) / out_a);
     self.pixel_buffer[offset + 3] = @intFromFloat(out_a * 255.0);
@@ -201,37 +201,37 @@ pub fn beginPath(self: *@This()) void {
 }
 
 /// Move the current point without drawing.
-pub fn moveTo(self: *@This(), x: f32, y: f32) void {
-    self.path.append(self.allocator, .{ .move_to = .{ .x = x, .y = y } }) catch {};
+pub fn moveTo(self: *@This(), x: f32, y: f32) !void {
+    try self.path.append(self.allocator, .{ .move_to = .{ .x = x, .y = y } });
 }
 
 /// Add a line segment from the current point to (x, y).
-pub fn lineTo(self: *@This(), x: f32, y: f32) void {
-    self.path.append(self.allocator, .{ .line_to = .{ .x = x, .y = y } }) catch {};
+pub fn lineTo(self: *@This(), x: f32, y: f32) !void {
+    try self.path.append(self.allocator, .{ .line_to = .{ .x = x, .y = y } });
 }
 
 /// Close the current path by drawing a line back to the starting point.
-pub fn closePath(self: *@This()) void {
-    self.path.append(self.allocator, .close_path) catch {};
+pub fn closePath(self: *@This()) !void {
+    try self.path.append(self.allocator, .close_path);
 }
 
 /// Add a quadratic bezier curve from the current point to (x, y) with control point (cx, cy).
-pub fn quadraticCurveTo(self: *@This(), cx: f32, cy: f32, x: f32, y: f32) void {
-    self.path.append(self.allocator, .{ .quad_to = .{ .cx = cx, .cy = cy, .x = x, .y = y } }) catch {};
+pub fn quadraticCurveTo(self: *@This(), cx: f32, cy: f32, x: f32, y: f32) !void {
+    try self.path.append(self.allocator, .{ .quad_to = .{ .cx = cx, .cy = cy, .x = x, .y = y } });
 }
 
 /// Add a cubic bezier curve from the current point to (x, y) with control points (c1x, c1y) and (c2x, c2y).
-pub fn bezierCurveTo(self: *@This(), c1x: f32, c1y: f32, c2x: f32, c2y: f32, x: f32, y: f32) void {
-    self.path.append(self.allocator, .{ .bezier_to = .{ .c1x = c1x, .c1y = c1y, .c2x = c2x, .c2y = c2y, .x = x, .y = y } }) catch {};
+pub fn bezierCurveTo(self: *@This(), c1x: f32, c1y: f32, c2x: f32, c2y: f32, x: f32, y: f32) !void {
+    try self.path.append(self.allocator, .{ .bezier_to = .{ .c1x = c1x, .c1y = c1y, .c2x = c2x, .c2y = c2y, .x = x, .y = y } });
 }
 
 /// Add an arc to the path. Angles are in radians.
-pub fn arc(self: *@This(), cx: f32, cy: f32, r: f32, start_angle: f32, end_angle: f32, ccw: bool) void {
-    self.path.append(self.allocator, .{ .arc = .{ .cx = cx, .cy = cy, .r = r, .start = start_angle, .end = end_angle, .ccw = ccw } }) catch {};
+pub fn arc(self: *@This(), cx: f32, cy: f32, r: f32, start_angle: f32, end_angle: f32, ccw: bool) !void {
+    try self.path.append(self.allocator, .{ .arc = .{ .cx = cx, .cy = cy, .r = r, .start = start_angle, .end = end_angle, .ccw = ccw } });
 }
 
 /// Add an arc between two tangent lines defined by (current→x1,y1) and (x1,y1→x2,y2) with radius r.
-pub fn arcTo(self: *@This(), x1: f32, y1: f32, x2: f32, y2: f32, r: f32) void {
+pub fn arcTo(self: *@This(), x1: f32, y1: f32, x2: f32, y2: f32, r: f32) !void {
     // Need current point to compute the tangent arc
     const cur = self.currentPoint() orelse return;
 
@@ -243,7 +243,7 @@ pub fn arcTo(self: *@This(), x1: f32, y1: f32, x2: f32, y2: f32, r: f32) void {
 
     const len1 = @sqrt(d1x * d1x + d1y * d1y);
     const len2 = @sqrt(d2x * d2x + d2y * d2y);
-    if (len1 < 1e-6 or len2 < 1e-6) return;
+    if (len1 < epsilon or len2 < epsilon) return;
 
     // Unit vectors
     const u1x = d1x / len1;
@@ -253,9 +253,9 @@ pub fn arcTo(self: *@This(), x1: f32, y1: f32, x2: f32, y2: f32, r: f32) void {
 
     // Cross product to determine winding
     const cross = u1x * u2y - u1y * u2x;
-    if (@abs(cross) < 1e-6) {
+    if (@abs(cross) < epsilon) {
         // Lines are parallel, just line to x1,y1
-        self.lineTo(x1, y1);
+        try self.lineTo(x1, y1);
         return;
     }
 
@@ -263,7 +263,7 @@ pub fn arcTo(self: *@This(), x1: f32, y1: f32, x2: f32, y2: f32, r: f32) void {
     const dot = u1x * u2x + u1y * u2y;
     const half_angle = std.math.acos(std.math.clamp(dot, -1.0, 1.0)) / 2.0;
     const tan_half = @tan(half_angle);
-    if (@abs(tan_half) < 1e-6) return;
+    if (@abs(tan_half) < epsilon) return;
 
     // Distance from corner to tangent points
     const dist = r / tan_half;
@@ -286,8 +286,8 @@ pub fn arcTo(self: *@This(), x1: f32, y1: f32, x2: f32, y2: f32, r: f32) void {
     const end_angle = std.math.atan2(t2y - acy, t2x - acx);
 
     // Line to the first tangent point, then arc
-    self.lineTo(t1x, t1y);
-    self.arc(acx, acy, r, start_angle, end_angle, ccw);
+    try self.lineTo(t1x, t1y);
+    try self.arc(acx, acy, r, start_angle, end_angle, ccw);
 }
 
 fn currentPoint(self: *const @This()) ?Point {
@@ -309,27 +309,33 @@ fn currentPoint(self: *const @This()) ?Point {
     return cur;
 }
 
+const epsilon = 1e-6;
+const epsilon_sq = 1e-12;
+const arc_gap_threshold = 0.01;
+const max_arc_segment = std.math.pi / 8.0; // tau / 16
+
 const flatten_tolerance = 0.25;
 const flatten_max_depth = 20;
 
-fn flattenPath(self: *const @This()) std.ArrayList(PathCommand) {
+fn flattenPath(self: *const @This()) !std.ArrayList(PathCommand) {
     var out: std.ArrayList(PathCommand) = .empty;
+    errdefer out.deinit(self.allocator);
     var cur: Point = .{ .x = 0, .y = 0 };
     var sub_start: Point = .{ .x = 0, .y = 0 };
 
     for (self.path.items) |cmd| {
         switch (cmd) {
             .move_to => |p| {
-                out.append(self.allocator, .{ .move_to = p }) catch {};
+                try out.append(self.allocator, .{ .move_to = p });
                 cur = p;
                 sub_start = p;
             },
             .line_to => |p| {
-                out.append(self.allocator, .{ .line_to = p }) catch {};
+                try out.append(self.allocator, .{ .line_to = p });
                 cur = p;
             },
             .close_path => {
-                out.append(self.allocator, .close_path) catch {};
+                try out.append(self.allocator, .close_path);
                 cur = sub_start;
             },
             .quad_to => |q| {
@@ -338,27 +344,27 @@ fn flattenPath(self: *const @This()) std.ArrayList(PathCommand) {
                 const end: Point = .{ .x = q.x, .y = q.y };
                 const c1 = Point.lerp(cur, ctrl, 2.0 / 3.0);
                 const c2 = Point.lerp(end, ctrl, 2.0 / 3.0);
-                flattenCubic(&out, self.allocator, cur, c1, c2, end, 0);
+                try flattenCubic(&out, self.allocator, cur, c1, c2, end, 0);
                 cur = end;
             },
             .bezier_to => |b| {
                 const c1: Point = .{ .x = b.c1x, .y = b.c1y };
                 const c2: Point = .{ .x = b.c2x, .y = b.c2y };
                 const end: Point = .{ .x = b.x, .y = b.y };
-                flattenCubic(&out, self.allocator, cur, c1, c2, end, 0);
+                try flattenCubic(&out, self.allocator, cur, c1, c2, end, 0);
                 cur = end;
             },
             .arc => |a| {
-                cur = flattenArc(&out, self.allocator, a, cur);
+                cur = try flattenArc(&out, self.allocator, a, cur);
             },
         }
     }
     return out;
 }
 
-fn flattenCubic(out: *std.ArrayList(PathCommand), allocator: std.mem.Allocator, p0: Point, p1: Point, p2: Point, p3: Point, depth: u32) void {
+fn flattenCubic(out: *std.ArrayList(PathCommand), allocator: std.mem.Allocator, p0: Point, p1: Point, p2: Point, p3: Point, depth: u32) !void {
     if (depth >= flatten_max_depth) {
-        out.append(allocator, .{ .line_to = p3 }) catch {};
+        try out.append(allocator, .{ .line_to = p3 });
         return;
     }
 
@@ -366,7 +372,7 @@ fn flattenCubic(out: *std.ArrayList(PathCommand), allocator: std.mem.Allocator, 
     const d1 = Point.distToLine(p1, p0, p3);
     const d2 = Point.distToLine(p2, p0, p3);
     if (@max(d1, d2) <= flatten_tolerance) {
-        out.append(allocator, .{ .line_to = p3 }) catch {};
+        try out.append(allocator, .{ .line_to = p3 });
         return;
     }
 
@@ -378,11 +384,11 @@ fn flattenCubic(out: *std.ArrayList(PathCommand), allocator: std.mem.Allocator, 
     const m123 = Point.lerp(m12, m23, 0.5);
     const mid = Point.lerp(m012, m123, 0.5);
 
-    flattenCubic(out, allocator, p0, m01, m012, mid, depth + 1);
-    flattenCubic(out, allocator, mid, m123, m23, p3, depth + 1);
+    try flattenCubic(out, allocator, p0, m01, m012, mid, depth + 1);
+    try flattenCubic(out, allocator, mid, m123, m23, p3, depth + 1);
 }
 
-fn flattenArc(out: *std.ArrayList(PathCommand), allocator: std.mem.Allocator, a: anytype, cur: Point) Point {
+fn flattenArc(out: *std.ArrayList(PathCommand), allocator: std.mem.Allocator, a: anytype, cur: Point) !Point {
     const tau = 2.0 * std.math.pi;
 
     var sweep = a.end - a.start;
@@ -394,7 +400,7 @@ fn flattenArc(out: *std.ArrayList(PathCommand), allocator: std.mem.Allocator, a:
         if (sweep > tau) sweep = tau;
     }
 
-    if (@abs(sweep) < 1e-6) return cur;
+    if (@abs(sweep) < epsilon) return cur;
 
     // Move/line to arc start point
     const start_pt: Point = .{
@@ -405,12 +411,12 @@ fn flattenArc(out: *std.ArrayList(PathCommand), allocator: std.mem.Allocator, a:
     // If current point differs from arc start, line to it
     const dx = cur.x - start_pt.x;
     const dy = cur.y - start_pt.y;
-    if (dx * dx + dy * dy > 0.01) {
-        out.append(allocator, .{ .line_to = start_pt }) catch {};
+    if (dx * dx + dy * dy > arc_gap_threshold) {
+        try out.append(allocator, .{ .line_to = start_pt });
     }
 
     // Split into segments of at most tau/16 radians
-    const max_seg = tau / 16.0;
+    const max_seg = max_arc_segment;
     const n_segs_f = @ceil(@abs(sweep) / max_seg);
     const n_segs: u32 = @intFromFloat(@max(1.0, n_segs_f));
     const seg_angle = sweep / @as(f32, @floatFromInt(n_segs));
@@ -443,7 +449,7 @@ fn flattenArc(out: *std.ArrayList(PathCommand), allocator: std.mem.Allocator, a:
             .y = p3.y - alpha * a.r * cos1,
         };
 
-        flattenCubic(out, allocator, p0, c1, c2, p3, 0);
+        try flattenCubic(out, allocator, p0, c1, c2, p3, 0);
 
         prev = p3;
         angle = next_angle;
@@ -483,9 +489,9 @@ fn drawLine(self: *@This(), x0: i32, y0: i32, x1: i32, y1: i32, color: [4]u8) vo
 }
 
 /// Stroke the current path using Bresenham's line algorithm.
-pub fn stroke(self: *@This()) void {
+pub fn stroke(self: *@This()) !void {
     const color = self.stroke_color;
-    var flat = self.flattenPath();
+    var flat = try self.flattenPath();
     defer flat.deinit(self.allocator);
 
     var start: ?Point = null;
@@ -529,10 +535,10 @@ pub fn stroke(self: *@This()) void {
 }
 
 /// Fill the current path using scanline rasterization with even-odd rule.
-pub fn fill(self: *@This()) void {
+pub fn fill(self: *@This()) !void {
     const color = self.fill_color;
 
-    var flat = self.flattenPath();
+    var flat = try self.flattenPath();
     defer flat.deinit(self.allocator);
 
     // Collect edges from flattened path
@@ -550,14 +556,14 @@ pub fn fill(self: *@This()) void {
             },
             .line_to => |p| {
                 if (current) |cur| {
-                    addEdge(&edges, self.allocator, cur, p);
+                    try addEdge(&edges, self.allocator, cur, p);
                 }
                 current = p;
             },
             .close_path => {
                 if (current) |cur| {
                     if (start) |s| {
-                        addEdge(&edges, self.allocator, cur, s);
+                        try addEdge(&edges, self.allocator, cur, s);
                     }
                 }
                 current = start;
@@ -594,7 +600,7 @@ pub fn fill(self: *@This()) void {
             const ey_max = @max(edge.y0, edge.y1);
             if (scanline >= ey_min and scanline < ey_max) {
                 const x_intersect = edge.x0 + (scanline - edge.y0) * (edge.x1 - edge.x0) / (edge.y1 - edge.y0);
-                intersections.append(self.allocator, x_intersect) catch return;
+                try intersections.append(self.allocator, x_intersect);
             }
         }
 
@@ -665,15 +671,15 @@ const Edge = struct {
     y1: f32,
 };
 
-fn addEdge(edges: *std.ArrayList(Edge), allocator: std.mem.Allocator, p0: Point, p1: Point) void {
+fn addEdge(edges: *std.ArrayList(Edge), allocator: std.mem.Allocator, p0: Point, p1: Point) !void {
     // Skip horizontal edges
     if (p0.y == p1.y) return;
-    edges.append(allocator, .{
+    try edges.append(allocator, .{
         .x0 = p0.x,
         .y0 = p0.y,
         .x1 = p1.x,
         .y1 = p1.y,
-    }) catch {};
+    });
 }
 
 // Tests
@@ -921,11 +927,11 @@ test "fill triangle" {
     defer ctx.path.deinit(allocator);
 
     ctx.setFillColor(.{ 255, 0, 0, 255 });
-    ctx.moveTo(5, 1);
-    ctx.lineTo(1, 8);
-    ctx.lineTo(9, 8);
-    ctx.closePath();
-    ctx.fill();
+    try ctx.moveTo(5, 1);
+    try ctx.lineTo(1, 8);
+    try ctx.lineTo(9, 8);
+    try ctx.closePath();
+    try ctx.fill();
 
     // center of triangle (5, 5) should be filled
     const offset55 = (5 * 10 + 5) * 4;
@@ -953,9 +959,9 @@ test "stroke path" {
     defer ctx.path.deinit(allocator);
 
     ctx.setStrokeColor(.{ 0, 255, 0, 255 });
-    ctx.moveTo(0, 0);
-    ctx.lineTo(4, 0);
-    ctx.stroke();
+    try ctx.moveTo(0, 0);
+    try ctx.lineTo(4, 0);
+    try ctx.stroke();
 
     // top row should be green
     for (0..5) |x| {
@@ -989,7 +995,10 @@ test "setPixel opaque src over opaque dst uses fast path" {
     const allocator = testing.allocator;
     const buf = try allocator.alloc(u8, 1 * 1 * 4);
     defer allocator.free(buf);
-    buf[0] = 10; buf[1] = 20; buf[2] = 30; buf[3] = 255;
+    buf[0] = 10;
+    buf[1] = 20;
+    buf[2] = 30;
+    buf[3] = 255;
 
     var ctx: @This() = .{
         .flush_target = undefined,
@@ -1007,7 +1016,10 @@ test "setPixel transparent src leaves dst unchanged" {
     const allocator = testing.allocator;
     const buf = try allocator.alloc(u8, 1 * 1 * 4);
     defer allocator.free(buf);
-    buf[0] = 10; buf[1] = 20; buf[2] = 30; buf[3] = 255;
+    buf[0] = 10;
+    buf[1] = 20;
+    buf[2] = 30;
+    buf[3] = 255;
 
     var ctx: @This() = .{
         .flush_target = undefined,
@@ -1026,7 +1038,10 @@ test "setPixel 50% alpha red over opaque white gives pinkish result" {
     const buf = try allocator.alloc(u8, 1 * 1 * 4);
     defer allocator.free(buf);
     // white background
-    buf[0] = 255; buf[1] = 255; buf[2] = 255; buf[3] = 255;
+    buf[0] = 255;
+    buf[1] = 255;
+    buf[2] = 255;
+    buf[3] = 255;
 
     var ctx: @This() = .{
         .flush_target = undefined,
@@ -1107,7 +1122,10 @@ test "drawImage 50% alpha over opaque white" {
     const allocator = testing.allocator;
     const buf = try allocator.alloc(u8, 1 * 1 * 4);
     defer allocator.free(buf);
-    buf[0] = 255; buf[1] = 255; buf[2] = 255; buf[3] = 255;
+    buf[0] = 255;
+    buf[1] = 255;
+    buf[2] = 255;
+    buf[3] = 255;
 
     var ctx: @This() = .{
         .flush_target = undefined,
@@ -1200,12 +1218,12 @@ test "quadraticCurveTo produces smooth curve" {
     defer ctx.path.deinit(allocator);
 
     ctx.setFillColor(.{ 255, 0, 0, 255 });
-    ctx.moveTo(0, 10);
-    ctx.quadraticCurveTo(10, 0, 19, 10);
-    ctx.lineTo(19, 19);
-    ctx.lineTo(0, 19);
-    ctx.closePath();
-    ctx.fill();
+    try ctx.moveTo(0, 10);
+    try ctx.quadraticCurveTo(10, 0, 19, 10);
+    try ctx.lineTo(19, 19);
+    try ctx.lineTo(0, 19);
+    try ctx.closePath();
+    try ctx.fill();
 
     // Interior pixel under the curve should be filled
     const offset = (15 * 20 + 10) * 4;
@@ -1231,12 +1249,12 @@ test "bezierCurveTo S-curve" {
     defer ctx.path.deinit(allocator);
 
     ctx.setFillColor(.{ 0, 255, 0, 255 });
-    ctx.moveTo(0, 10);
-    ctx.bezierCurveTo(10, 0, 20, 19, 29, 10);
-    ctx.lineTo(29, 19);
-    ctx.lineTo(0, 19);
-    ctx.closePath();
-    ctx.fill();
+    try ctx.moveTo(0, 10);
+    try ctx.bezierCurveTo(10, 0, 20, 19, 29, 10);
+    try ctx.lineTo(29, 19);
+    try ctx.lineTo(0, 19);
+    try ctx.closePath();
+    try ctx.fill();
 
     // Bottom center should be filled
     const offset = (18 * 30 + 15) * 4;
@@ -1260,9 +1278,9 @@ test "arc draws circle" {
     defer ctx.path.deinit(allocator);
 
     ctx.setFillColor(.{ 0, 0, 255, 255 });
-    ctx.arc(20, 20, 15, 0, 2.0 * std.math.pi, false);
-    ctx.closePath();
-    ctx.fill();
+    try ctx.arc(20, 20, 15, 0, 2.0 * std.math.pi, false);
+    try ctx.closePath();
+    try ctx.fill();
 
     // Center should be filled
     const center = (20 * size + 20) * 4;
@@ -1295,13 +1313,13 @@ test "arcTo rounded corner" {
 
     ctx.setFillColor(.{ 255, 255, 0, 255 });
     // Draw a rounded corner: right edge → corner → bottom edge with radius 10
-    ctx.moveTo(25, 0);
-    ctx.lineTo(25, 10);
-    ctx.arcTo(25, 25, 10, 25, 10);
-    ctx.lineTo(0, 25);
-    ctx.lineTo(0, 0);
-    ctx.closePath();
-    ctx.fill();
+    try ctx.moveTo(25, 0);
+    try ctx.lineTo(25, 10);
+    try ctx.arcTo(25, 25, 10, 25, 10);
+    try ctx.lineTo(0, 25);
+    try ctx.lineTo(0, 0);
+    try ctx.closePath();
+    try ctx.fill();
 
     // Interior point should be filled
     const offset = (5 * size + 5) * 4;
@@ -1326,10 +1344,10 @@ test "arc partial quarter circle" {
 
     ctx.setFillColor(.{ 255, 0, 255, 255 });
     // Quarter circle: 0 to pi/2, centered at (15,15), radius 12
-    ctx.moveTo(15, 15);
-    ctx.arc(15, 15, 12, 0, std.math.pi / 2.0, false);
-    ctx.closePath();
-    ctx.fill();
+    try ctx.moveTo(15, 15);
+    try ctx.arc(15, 15, 12, 0, std.math.pi / 2.0, false);
+    try ctx.closePath();
+    try ctx.fill();
 
     // Point in the quarter (right-down quadrant) should be filled
     const offset = (20 * size + 22) * 4;

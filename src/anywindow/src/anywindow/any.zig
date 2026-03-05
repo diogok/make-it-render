@@ -18,7 +18,7 @@ pub const Image = switch (builtin.os.tag) {
 
 /// Event source adapter for use with the generic event loop.
 /// Wraps a WindowManager to conform to the poll/stop interface.
-pub const EventSource = struct{
+pub const EventSource = struct {
     wm: *WindowManager,
     running: bool = true,
 

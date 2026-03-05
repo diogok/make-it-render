@@ -5,7 +5,7 @@ const queue = @import("anywindow/queue.zig");
 pub const WindowManager = any.WindowManager;
 pub const Window = any.Window;
 pub const Image = any.Image;
-pub const EventSource =any.EventSource;
+pub const EventSource = any.EventSource;
 
 pub const WindowID = common.WindowID;
 pub const Size = common.Size;
@@ -15,7 +15,6 @@ pub const Width = common.Width;
 pub const BBox = common.BBox;
 pub const X = common.X;
 pub const Y = common.Y;
-pub const Pixels = common.Pixels;
 pub const Scancode = common.Scancode;
 pub const Key = common.Key;
 pub const Modifiers = common.Modifiers;

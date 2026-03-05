@@ -1,3 +1,5 @@
+//! Shared types for window management: events, geometry, keys.
+
 pub const WindowID = usize;
 
 pub const Height = u16;

@@ -1,3 +1,4 @@
+//! Keyboard scancode and key mappings across platforms.
 
 /// Logical key identity. Printable characters use their ASCII code point.
 /// Non-printable keys use values in the 0x100+ range.

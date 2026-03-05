@@ -1,3 +1,5 @@
+//! Composites multiple Images onto a window surface.
+
 window: *anywin.Window,
 images: std.ArrayList(*Image),
 allocator: std.mem.Allocator,
