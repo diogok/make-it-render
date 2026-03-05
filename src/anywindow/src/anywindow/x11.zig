@@ -140,9 +140,9 @@ pub const WindowManager = struct {
                 },
                 .KeyRelease => |key_release| {
                     const evdev_code = key_release.keycode -| 8;
-                    const sc = key_mapping.evdevToScancode(evdev_code);
+                    const sc = keys.evdevToScancode(evdev_code);
                     const keysym = self.lookupKeysym(key_release.keycode, key_release.state);
-                    const key = key_mapping.x11KeysymToKey(keysym);
+                    const key = keys.x11KeysymToKey(keysym);
                     const mods = x11ModsFromState(key_release.state);
                     return .{
                         .key_released = .{
@@ -155,9 +155,9 @@ pub const WindowManager = struct {
                 },
                 .KeyPress => |key_press| {
                     const evdev_code = key_press.keycode -| 8;
-                    const sc = key_mapping.evdevToScancode(evdev_code);
+                    const sc = keys.evdevToScancode(evdev_code);
                     const keysym = self.lookupKeysym(key_press.keycode, key_press.state);
-                    const key = key_mapping.x11KeysymToKey(keysym);
+                    const key = keys.x11KeysymToKey(keysym);
                     const mods = x11ModsFromState(key_press.state);
                     return .{
                         .key_pressed = .{
@@ -452,6 +452,7 @@ pub const Image = struct {
     size: common.Size,
 
     pub fn init(window: *Window, size: common.Size) !@This() {
+        std.debug.assert(size.width * size.height * 4 <= std.math.maxInt(u16));
         const pixmap_id = try window.wm.xid.genID();
 
         const pixmap_req = x11.proto.CreatePixmap{
@@ -592,6 +593,6 @@ const std = @import("std");
 const x11 = @import("x11");
 const common = @import("common.zig");
 const queue = @import("queue.zig");
-const key_mapping = @import("key.zig");
+const keys = @import("keys.zig");
 
 const log = std.log.scoped(.any_x11);

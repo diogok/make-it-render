@@ -1,6 +1,5 @@
 //! Event source adapter for use with the generic event loop.
-//! Wraps a WindowManager to conform to the poll/stop interface
-//! expected by `loop.eventLoop`.
+//! Wraps a WindowManager to conform to the poll/stop interface.
 
 wm: *@import("../root.zig").WindowManager,
 running: bool = true,

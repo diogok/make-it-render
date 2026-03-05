@@ -481,9 +481,9 @@ pub fn windowProc(
         },
         .WM_KEYDOWN => {
             const flags: win.KeystrokeFlags = @bitCast(lparam);
-            const sc = key_mapping.windowsScanToScancode(flags.scanCode, flags.extended == 1);
+            const sc = keys.windowsScanToScancode(flags.scanCode, flags.extended == 1);
             const vk: u8 = @truncate(wparam);
-            const key = key_mapping.windowsVkToKey(vk);
+            const key = keys.windowsVkToKey(vk);
             const mods = getWindowsModifiers();
 
             events.push(.{
@@ -497,9 +497,9 @@ pub fn windowProc(
         },
         .WM_KEYUP => {
             const flags: win.KeystrokeFlags = @bitCast(lparam);
-            const sc = key_mapping.windowsScanToScancode(flags.scanCode, flags.extended == 1);
+            const sc = keys.windowsScanToScancode(flags.scanCode, flags.extended == 1);
             const vk: u8 = @truncate(wparam);
-            const key = key_mapping.windowsVkToKey(vk);
+            const key = keys.windowsVkToKey(vk);
             const mods = getWindowsModifiers();
 
             events.push(.{
@@ -549,6 +549,6 @@ const std = @import("std");
 const win = @import("windows");
 const common = @import("common.zig");
 const queue = @import("queue.zig");
-const key_mapping = @import("key.zig");
+const keys = @import("keys.zig");
 
 const log = std.log.scoped(.any_win32);
