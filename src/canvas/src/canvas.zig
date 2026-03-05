@@ -28,10 +28,10 @@ pub fn createImage(self: *@This(), bbox: anywin.common.BBox) !*Image {
 
     const scaling = self.window.scaling;
 
-    const width: u16 = if (scaling != 1.0) @intFromFloat(@as(f16, @floatFromInt(bbox.width)) * scaling) else bbox.width;
-    const height: u16 = if (scaling != 1.0) @intFromFloat(@as(f16, @floatFromInt(bbox.height)) * scaling) else bbox.height;
-    const x: i16 = if (scaling != 1.0) @intFromFloat(@as(f16, @floatFromInt(bbox.x)) * scaling) else bbox.x;
-    const y: i16 = if (scaling != 1.0) @intFromFloat(@as(f16, @floatFromInt(bbox.y)) * scaling) else bbox.y;
+    const width = Image.applyScaling(bbox.width, scaling);
+    const height = Image.applyScaling(bbox.height, scaling);
+    const x = Image.applyScaling(bbox.x, scaling);
+    const y = Image.applyScaling(bbox.y, scaling);
 
     img.* = try self.window.createImage(.{ .width = width, .height = height });
     try self.window.wm.flush();

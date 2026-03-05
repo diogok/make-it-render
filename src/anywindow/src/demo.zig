@@ -24,12 +24,11 @@ pub fn main() !void {
         y, y, y, y, y,
         y, y, y, y, y,
     };
-    var pixels = std.mem.toBytes(yellow_block);
-    var pixel_reader = std.Io.Reader.fixed(&pixels);
+    const pixels = std.mem.toBytes(yellow_block);
 
     var image = try window.createImage(.{ .height = 5, .width = 5 });
     defer image.deinit();
-    try image.setPixels(&pixel_reader);
+    try image.setPixels(&pixels);
     try wm.flush();
 
     var timer = try std.time.Timer.start();

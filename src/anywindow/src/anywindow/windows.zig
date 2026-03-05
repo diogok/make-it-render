@@ -305,21 +305,14 @@ pub const Image = struct {
         };
     }
 
-    pub fn setPixels(self: @This(), reader: *std.Io.Reader) !void {
+    pub fn setPixels(self: @This(), pixels: []const u8) !void {
         var i: usize = 0;
-        while (true) {
-            defer i += 4;
-            const src_pixels = reader.take(4) catch |err| {
-                switch (err) {
-                    error.EndOfStream => break,
-                    error.ReadFailed => return err,
-                }
-            };
+        while (i + 3 < pixels.len) : (i += 4) {
             // RGB to BGR
-            self.pixels[i] = src_pixels[2];
-            self.pixels[i + 1] = src_pixels[1];
-            self.pixels[i + 2] = src_pixels[0];
-            self.pixels[i + 3] = src_pixels[3];
+            self.pixels[i] = pixels[i + 2];
+            self.pixels[i + 1] = pixels[i + 1];
+            self.pixels[i + 2] = pixels[i];
+            self.pixels[i + 3] = pixels[i + 3];
         }
     }
 

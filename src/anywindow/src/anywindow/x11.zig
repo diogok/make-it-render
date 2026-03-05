@@ -472,10 +472,11 @@ pub const Image = struct {
         };
     }
 
-    pub fn setPixels(self: @This(), src_reader: *std.Io.Reader) !void {
+    pub fn setPixels(self: @This(), pixels: []const u8) !void {
         const image_info = x11.getImageInfo(self.window.wm.info, self.window.root);
 
-        var pixmap_reader = x11.RgbaToZPixmapReader.init(image_info, src_reader);
+        var reader = std.Io.Reader.fixed(pixels);
+        var pixmap_reader = x11.RgbaToZPixmapReader.init(image_info, &reader);
 
         const put_image_req = x11.proto.PutImage{
             .drawable_id = self.image_id,

@@ -9,41 +9,22 @@ pub const Bitmap = struct {
         self.allocator.free(self.bitmap);
     }
 
-    pub fn pixelReader(self: *@This(), pixel: []const u8) !PixelReader {
-        std.debug.assert(pixel.len == 4);
-        return try PixelReader.init(self.allocator, self.bitmap, pixel);
+    pub fn toRgba(self: *@This(), allocator: std.mem.Allocator, pixel: []const u8) ![]u8 {
+        return bitmapToRgba(allocator, self.bitmap, pixel);
     }
 };
 
-const PixelReader = struct {
-    allocator: std.mem.Allocator,
-    interface: std.Io.Reader,
-    buffer: []u8,
-
-    pub fn init(
-        allocator: std.mem.Allocator,
-        bitmap: []const u1,
-        pixel: []const u8,
-    ) !@This() {
-        std.debug.assert(pixel.len == 4);
-        var buffer = try allocator.alloc(u8, bitmap.len * 4);
-        for (bitmap, 0..) |b, i| {
-            if (b == 1) {
-                std.mem.copyForwards(u8, buffer[i * 4 ..], pixel);
-            } else {
-                std.mem.copyForwards(u8, buffer[i * 4 ..], &[4]u8{ 0, 0, 0, 0 });
-            }
+pub fn bitmapToRgba(allocator: std.mem.Allocator, bitmap: []const u1, pixel: []const u8) ![]u8 {
+    std.debug.assert(pixel.len == 4);
+    const buffer = try allocator.alloc(u8, bitmap.len * 4);
+    for (bitmap, 0..) |b, i| {
+        if (b == 1) {
+            @memcpy(buffer[i * 4 ..][0..4], pixel);
+        } else {
+            @memcpy(buffer[i * 4 ..][0..4], &[4]u8{ 0, 0, 0, 0 });
         }
-        return .{
-            .allocator = allocator,
-            .interface = std.io.Reader.fixed(buffer),
-            .buffer = buffer,
-        };
     }
-
-    pub fn deinit(self: *@This()) void {
-        self.allocator.free(self.buffer);
-    }
-};
+    return buffer;
+}
 
 const std = @import("std");

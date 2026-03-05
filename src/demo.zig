@@ -83,13 +83,13 @@ pub fn main() !void {
         var icon_bitmap = try make_it_render.image.parse(allocator, &z_reader);
         defer icon_bitmap.deinit();
 
-        var icon_reader = try icon_bitmap.pixelReader(&[_]u8{ 255, 150, 0, 255 });
-        defer icon_reader.deinit();
+        const icon_pixels = try icon_bitmap.toRgba(allocator, &[_]u8{ 255, 150, 0, 255 });
+        defer allocator.free(icon_pixels);
 
         try window.setIcon(.{
             .width = icon_bitmap.width,
             .height = icon_bitmap.height,
-            .pixels = icon_reader.buffer,
+            .pixels = icon_pixels,
         });
     }
 
