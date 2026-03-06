@@ -12,9 +12,6 @@
         .image = .{
             .path = "src/image",
         },
-        .canvas = .{
-            .path = "src/canvas",
-        },
         .loop = .{
             .path = "src/loop",
         },

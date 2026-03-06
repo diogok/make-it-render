@@ -2,7 +2,6 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() != .leak);
     const allocator = gpa.allocator();
-    //const allocator = std.heap.smp_allocator;
 
     var timer = try std.time.Timer.start();
 
@@ -22,27 +21,40 @@ pub fn main() !void {
     defer freeFonts(allocator, fonts);
     log.debug("Time to load fonts: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
-    var canvas: Canvas = .init(allocator, &window);
-    defer canvas.deinit();
+    var images: std.ArrayList(*anywin.Image) = .empty;
+    defer {
+        for (images.items) |img| {
+            img.deinit();
+            allocator.destroy(img);
+        }
+        images.deinit(allocator);
+    }
 
     // let's draw Welcomes
     for (welcome, 0..) |txt, i| {
         var text = try textz.render(allocator, fonts, txt);
         defer text.deinit();
 
-        var img = try canvas.createImage(.{
-            .height = text.height,
-            .width = text.width,
-            .x = 100,
-            .y = 100 + (@as(u8, @truncate(i)) * 20),
-        });
-        var ctx = try img.getContext();
-        defer ctx.deinit();
+        const img = try allocator.create(anywin.Image);
+        errdefer allocator.destroy(img);
+        img.* = try anywin.Image.init(
+            allocator,
+            &window,
+            .{
+                .height = text.height,
+                .width = text.width,
+                .x = 100,
+                .y = 100 + (@as(i16, @intCast(i)) * 20),
+            },
+        );
+        errdefer img.deinit();
 
-        ctx.setFillColor(.{ 255, 150, 0, 255 });
-        ctx.fillText(fonts, txt, 0, 0);
-        try ctx.flush();
+        const rgba = try text.toRgba(allocator, &[_]u8{ 255, 150, 0, 255 });
+        defer allocator.free(rgba);
+        try img.setPixels(rgba);
         try wm.flush();
+
+        try images.append(allocator, img);
     }
 
     // render PBM image
@@ -51,31 +63,40 @@ pub fn main() !void {
         var bitmap = try make_it_render.image.parse(allocator, &z_reader);
         defer bitmap.deinit();
 
-        var img = try canvas.createImage(.{
+        const img = try allocator.create(anywin.Image);
+        errdefer allocator.destroy(img);
+        img.* = try anywin.Image.init(allocator, &window, .{
             .width = bitmap.width,
             .height = bitmap.height,
             .x = 50,
             .y = 120,
         });
-        var ctx = try img.getContext();
-        defer ctx.deinit();
+        errdefer img.deinit();
 
-        ctx.setFillColor(.{ 255, 150, 0, 255 });
-        ctx.putImage(bitmap.bitmap, bitmap.width, bitmap.height, 0, 0);
-        try ctx.flush();
+        const rgba = try bitmap.toRgba(allocator, &[_]u8{ 255, 150, 0, 255 });
+        defer allocator.free(rgba);
+        try img.setPixels(rgba);
         try wm.flush();
+
+        try images.append(allocator, img);
     }
 
     // mouse position overlay
-    var mouse_pos_img = try canvas.createImage(.{
-        .x = 0,
-        .y = 0,
-        .height = 16,
-        .width = 120,
-    });
-    var mouse_ctx = try mouse_pos_img.getContext();
-    defer mouse_ctx.deinit();
-    mouse_ctx.setFillColor(.{ 255, 150, 0, 255 });
+    const mouse_img = try allocator.create(anywin.Image);
+    defer {
+        mouse_img.deinit();
+        allocator.destroy(mouse_img);
+    }
+    {
+        var sample = try textz.render(allocator, fonts, "    0x    0");
+        defer sample.deinit();
+        mouse_img.* = try anywin.Image.init(allocator, &window, .{
+            .x = 0,
+            .y = 0,
+            .height = sample.height,
+            .width = sample.width,
+        });
+    }
 
     // set window icon from PBM z image
     {
@@ -96,7 +117,7 @@ pub fn main() !void {
     // sync any pending operation
     try wm.flush();
 
-    log.debug("Time to initial canvas: {d}ms", .{timer.lap() / std.time.ns_per_ms});
+    log.debug("Time to initial render: {d}ms", .{timer.lap() / std.time.ns_per_ms});
 
     // show the window now that we have all ready
     try window.show();
@@ -116,7 +137,11 @@ pub fn main() !void {
                 .draw => {
                     timer.reset();
 
-                    try canvas.draw();
+                    try window.beginDraw();
+                    try window.clear(.{});
+                    for (images.items) |img| try img.draw();
+                    try mouse_img.draw();
+                    try window.endDraw();
 
                     log.debug("Time to draw: {d}ms", .{timer.lap() / std.time.ns_per_ms});
                 },
@@ -134,13 +159,16 @@ pub fn main() !void {
                     const mouse_pos_txt = try std.fmt.allocPrint(allocator, "{d:5}x{d:5}", .{ move.x, move.y });
                     defer allocator.free(mouse_pos_txt);
 
-                    mouse_ctx.clearRect(0, 0, mouse_ctx.width, mouse_ctx.height);
-                    mouse_ctx.fillText(fonts, mouse_pos_txt, 0, 0);
-                    try mouse_ctx.flush();
+                    var bmp = try textz.render(allocator, fonts, mouse_pos_txt);
+                    defer bmp.deinit();
+
+                    const rgba = try bmp.toRgba(allocator, &[_]u8{ 255, 150, 0, 255 });
+                    defer allocator.free(rgba);
+                    try mouse_img.setPixels(rgba);
                     try wm.flush();
 
-                    mouse_pos_img.setX(move.x);
-                    mouse_pos_img.setY(move.y);
+                    mouse_img.setX(move.x);
+                    mouse_img.setY(move.y);
 
                     try window.redraw(.{});
                 },
@@ -189,7 +217,6 @@ const make_it_render = @import("make_it_render");
 
 const anywin = make_it_render.anywindow;
 const textz = make_it_render.text;
-const Canvas = make_it_render.canvas.Canvas;
 const eventLoop = make_it_render.loop.eventLoop;
 
 const log = std.log.scoped(.demo);

@@ -10,11 +10,13 @@ pub const Window = switch (builtin.os.tag) {
     else => @compileError("platform not supported"),
 };
 
-pub const Image = switch (builtin.os.tag) {
+pub const PlatformImage = switch (builtin.os.tag) {
     .linux => x11.Image,
     .windows => windows.Image,
     else => @compileError("platform not supported"),
 };
+
+pub const Image = @import("image.zig");
 
 /// Event source adapter for use with the generic event loop.
 /// Wraps a WindowManager to conform to the poll/stop interface.
@@ -39,6 +41,10 @@ pub const EventSource = struct {
         self.running = false;
     }
 };
+
+test {
+    _ = Image;
+}
 
 test "init" {
     var wm = WindowManager.init(testing.allocator) catch |err| switch (err) {

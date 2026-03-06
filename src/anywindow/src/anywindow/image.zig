@@ -1,84 +1,79 @@
-//! A positioned drawable surface within a Canvas.
-//! Wraps a platform image with logical and physical bounding boxes,
-//! handles DPI scaling via nearest-neighbor, and provides a drawing
-//! Context for direct pixel operations.
+//! A positioned image with DPI scaling.
+//! Wraps the platform image with logical coordinates, applying
+//! nearest-neighbor scaling when the window has a scaling factor.
 
-image: *anywin.Image,
-dst_bbox: anywin.common.BBox,
-
-src_bbox: anywin.common.BBox,
-scaling: f32 = 1.0,
-dirty: bool = true,
-z_index: i32 = 0,
-
+platform_image: PlatformImage,
+window: *Window,
+bbox: common.BBox,
+scaling: f32,
 allocator: std.mem.Allocator,
 
-/// Set pixel data from an RGBA buffer. Applies nearest-neighbor scaling if needed.
+pub fn init(allocator: std.mem.Allocator, window: *Window, bbox: common.BBox) !@This() {
+    const s = window.scaling;
+
+    const phys_width = scale(bbox.width, s);
+    const phys_height = scale(bbox.height, s);
+
+    const platform_image = try window.createImage(.{ .width = phys_width, .height = phys_height });
+
+    return .{
+        .platform_image = platform_image,
+        .window = window,
+        .bbox = bbox,
+        .scaling = s,
+        .allocator = allocator,
+    };
+}
+
+pub fn deinit(self: *@This()) void {
+    self.platform_image.deinit();
+}
+
 pub fn setPixels(self: *@This(), pixels: []const u8) !void {
-    self.dirty = true;
     if (self.scaling == 1.0) {
-        try self.image.setPixels(pixels);
+        try self.platform_image.setPixels(pixels);
     } else {
+        const phys_width = scale(self.bbox.width, self.scaling);
+        const phys_height = scale(self.bbox.height, self.scaling);
         const scaled = try nearestNeighbor(
             self.allocator,
             pixels,
-            self.src_bbox.width,
-            self.src_bbox.height,
-            self.dst_bbox.width,
-            self.dst_bbox.height,
+            self.bbox.width,
+            self.bbox.height,
+            phys_width,
+            phys_height,
         );
         defer self.allocator.free(scaled);
-        try self.image.setPixels(scaled);
+        try self.platform_image.setPixels(scaled);
     }
 }
 
-/// Set the X position in logical coordinates.
-pub fn setX(self: *@This(), x: anywin.common.X) void {
-    self.src_bbox.x = x;
-    self.dst_bbox.x = applyScaling(x, self.scaling);
-    self.dirty = true;
-}
-
-/// Set the Y position in logical coordinates.
-pub fn setY(self: *@This(), y: anywin.common.Y) void {
-    self.src_bbox.y = y;
-    self.dst_bbox.y = applyScaling(y, self.scaling);
-    self.dirty = true;
-}
-
-/// Set the z-ordering index. Higher values draw on top.
-pub fn setZIndex(self: *@This(), z: i32) void {
-    self.z_index = z;
-    self.dirty = true;
-}
-
-/// Obtain a 2D drawing context for this image.
-pub fn getContext(self: *@This()) !Context {
-    const Self = @This();
-    const flush_target = Context.FlushTarget{
-        .ptr = self,
-        .flushFn = struct {
-            fn f(ptr: *anyopaque, pixels: []const u8) anyerror!void {
-                const img: *Self = @ptrCast(@alignCast(ptr));
-                try img.setPixels(pixels);
-            }
-        }.f,
-    };
-    return try Context.init(flush_target, self.src_bbox.width, self.src_bbox.height, self.allocator);
-}
-
-/// Draw this image to the window at its current position.
 pub fn draw(self: *@This()) !void {
-    try self.image.draw(.{
-        .x = self.dst_bbox.x,
-        .y = self.dst_bbox.y,
-        .width = self.dst_bbox.width,
-        .height = self.dst_bbox.height,
+    try self.platform_image.draw(.{
+        .x = scale(self.bbox.x, self.scaling),
+        .y = scale(self.bbox.y, self.scaling),
+        .width = scale(self.bbox.width, self.scaling),
+        .height = scale(self.bbox.height, self.scaling),
     });
-    self.dirty = false;
 }
 
-pub fn applyScaling(v: anytype, scaling: f32) @TypeOf(v) {
+pub fn setX(self: *@This(), x: common.X) void {
+    self.bbox.x = x;
+}
+
+pub fn setY(self: *@This(), y: common.Y) void {
+    self.bbox.y = y;
+}
+
+pub fn width(self: *const @This()) u16 {
+    return self.bbox.width;
+}
+
+pub fn height(self: *const @This()) u16 {
+    return self.bbox.height;
+}
+
+fn scale(v: anytype, scaling: f32) @TypeOf(v) {
     if (scaling == 1.0) return v;
     return @intFromFloat(@as(f32, @floatFromInt(v)) * scaling);
 }
@@ -86,10 +81,10 @@ pub fn applyScaling(v: anytype, scaling: f32) @TypeOf(v) {
 fn nearestNeighbor(
     allocator: std.mem.Allocator,
     src: []const u8,
-    src_width: anywin.common.Width,
-    src_height: anywin.common.Height,
-    dst_width: anywin.common.Width,
-    dst_height: anywin.common.Height,
+    src_width: common.Width,
+    src_height: common.Height,
+    dst_width: common.Width,
+    dst_height: common.Height,
 ) ![]u8 {
     const y_ratio: f64 = @as(f64, @floatFromInt(src_height)) / @as(f64, @floatFromInt(dst_height));
     const x_ratio: f64 = @as(f64, @floatFromInt(src_width)) / @as(f64, @floatFromInt(dst_width));
@@ -217,6 +212,8 @@ test "nearestNeighbor single pixel upscale" {
 }
 
 const std = @import("std");
-const anywin = @import("anywindow");
-const Context = @import("context.zig");
 const testing = std.testing;
+const common = @import("common.zig");
+const any = @import("any.zig");
+const PlatformImage = any.PlatformImage;
+const Window = any.Window;

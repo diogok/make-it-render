@@ -23,9 +23,6 @@ pub fn build(b: *std.Build) void {
     const image = b.dependency("image", .{ .target = target, .optimize = optimize });
     make_it_render.addImport("image", image.module("image"));
 
-    const canvas = b.dependency("canvas", .{ .target = target, .optimize = optimize });
-    make_it_render.addImport("canvas", canvas.module("canvas"));
-
     const loop = b.dependency("loop", .{ .target = target, .optimize = optimize });
     make_it_render.addImport("loop", loop.module("loop"));
 
@@ -60,7 +57,6 @@ pub fn build(b: *std.Build) void {
         tests_mod.addImport("anywindow", anywindow.module("anywindow"));
         tests_mod.addImport("text", text.module("text"));
         tests_mod.addImport("image", image.module("image"));
-        tests_mod.addImport("canvas", canvas.module("canvas"));
         tests_mod.addImport("loop", loop.module("loop"));
 
         const tests = b.addTest(.{
