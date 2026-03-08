@@ -10,8 +10,6 @@ It is an experimental project with constant changes.
 - Window management, keyboard and mouse input events
 - Text rendering with Unicode support (embedded Terminus and Unifont fonts)
 - Image loading (PBM format) and scaling
-- 2D drawing Context inspired by HTML5 Canvas API (paths, fills, strokes, text)
-- Alpha blending (source-over compositing)
 - Generic event loop with comptime union generation and thread-per-source polling
 - Fullscreen toggle and window icon support
 - Pure Zig — only uses C when linking to Win32 required libraries
@@ -28,19 +26,16 @@ It is an experimental project with constant changes.
 
 Each module is independent and usable by itself.
 
-- **anywindow** — Window handling abstraction
+- **anywindow** — Window handling abstraction and image display
 	- x11: native X11 protocol implementation (no Xlib)
 	- windows: Win32 API
 	- macos: (planned)
+	- image: positioned image with DPI scaling and nearest-neighbor upscaling
 - **text** — Font loading, glyph rendering, Unicode support
 	- fonts: embedded Unifont and Terminus (multiple sizes)
 	- bdf: BDF font format parser (with gzip support)
 - **image** — Image loading
 	- pbm: PBM format (P1 ASCII and P4 binary)
-- **canvas** — Drawing and compositing
-	- canvas: layered drawing area with z-order and DPI scaling
-	- image: nearest-neighbor scaling, dirty tracking
-	- context: 2D drawing context with paths, fills, strokes, text, and alpha blending
 - **loop** — Generic event loop
 	- comptime union generation from multiple event sources
 	- thread-per-source polling with thread-safe queue
@@ -49,7 +44,7 @@ Each module is independent and usable by itself.
 
 Notably missing:
 
-- Wayland support
+- Wayland support, works using XWayland
 - macOS support
 
 ## Usage
@@ -81,34 +76,38 @@ exe_mod.addImport("make_it_render", make_it_render.module("make_it_render"));
 ```zig
 const std = @import("std");
 const make_it_render = @import("make_it_render");
+const anywin = make_it_render.anywindow;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() != .leak);
     const allocator = gpa.allocator();
 
-    var wm = try make_it_render.anywindow.WindowManager.init(allocator);
+    var wm = try anywin.WindowManager.init(allocator);
     defer wm.deinit();
 
     var window = try wm.createWindow(.{ .title = "hello, world." });
     defer window.deinit();
 
-    var canvas: make_it_render.canvas.Canvas = .init(allocator, &window);
-    defer canvas.deinit();
+    // create an image and set its pixels
+    var img = try anywin.Image.init(allocator, &window, .{ .width = 200, .height = 100, .x = 10, .y = 10 });
+    defer img.deinit();
 
-    // create an image layer and draw on it using the 2D context
-    var img = try canvas.createImage(.{ .width = 200, .height = 100, .x = 10, .y = 10 });
-    var ctx = try img.getContext();
-    defer ctx.deinit();
+    // render text to RGBA pixels and display it
+    const fonts = try make_it_render.text.loadFonts(allocator, .{});
+    defer make_it_render.text.freeFonts(allocator, fonts);
 
-    ctx.setFillColor(.{ 255, 150, 0, 255 });
-    ctx.fillRect(0, 0, 200, 100);
-    try ctx.flush();
+    var text = try make_it_render.text.render(allocator, fonts, "hello, world.");
+    defer text.deinit();
+
+    const rgba = try text.toRgba(allocator, &[_]u8{ 255, 150, 0, 255 });
+    defer allocator.free(rgba);
+    try img.setPixels(rgba);
 
     try window.show();
 
     // event loop with thread-per-source polling
-    var window_source: make_it_render.anywindow.WindowSource = .{ .wm = &wm };
+    var window_source: anywin.EventSource = .{ .wm = &wm };
     var ev_loop = make_it_render.loop.eventLoop(.{ .window = &window_source });
     defer ev_loop.deinit();
     try ev_loop.start();
@@ -120,7 +119,12 @@ pub fn main() !void {
                     window.close();
                     ev_loop.stop();
                 },
-                .draw => try canvas.draw(),
+                .draw => {
+                    try window.beginDraw();
+                    try window.clear(.{});
+                    try img.draw();
+                    try window.endDraw();
+                },
                 else => {},
             },
         }
@@ -128,7 +132,7 @@ pub fn main() !void {
 }
 ```
 
-See [src/demo.zig](src/demo.zig) for a more complete example with text rendering, image loading, mouse tracking, and fullscreen toggle.
+See [src/demo.zig](src/demo.zig) for a more complete example with text rendering, image loading, mouse tracking, fullscreen toggle and icon.
 
 ## License
 

@@ -249,17 +249,14 @@ root (make_it_render)
  ├── anywindow
  │    ├── x11        (standalone)
  │    └── windows    (standalone)
- ├── canvas
- │    ├── anywindow  (shared)
- │    └── text       (standalone)
  ├── text            (standalone)
  ├── image           (standalone)
  └── loop            (standalone)
 ```
 
-6 out of 8 modules have zero dependencies. `anywindow` composes two
-platform-specific backends. `canvas` depends on `anywindow` and `text`. The
-rest can be copied into any project with no changes.
+5 out of 6 modules have zero dependencies. `anywindow` composes two
+platform-specific backends. The rest can be copied into any project with no
+changes.
 
 ## Extracting a module for reuse
 

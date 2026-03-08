@@ -6,7 +6,7 @@ Zig conventions used across make-it-render modules.
 
 | Kind              | Style        | Examples                                     |
 |-------------------|--------------|----------------------------------------------|
-| Types / structs   | `PascalCase` | `Canvas`, `Image`, `FlushTarget`, `BBox`     |
+| Types / structs   | `PascalCase` | `Image`, `Window`, `FlushTarget`, `BBox`     |
 | Functions         | `camelCase`  | `setPixels`, `getContext`, `fillText`         |
 | Variables / fields| `snake_case` | `fill_color`, `line_width`, `pixel_buffer`   |
 | Tagged union tags | `snake_case` | `move_to`, `line_to`, `key_pressed`          |
@@ -34,13 +34,15 @@ When a file defines a single primary type, the file _is_ the struct — bare
 fields at the top, methods below, no wrapping `pub const Foo = struct { ... }`.
 
 ```zig
-// canvas.zig — the file IS the Canvas struct
+// image.zig — the file IS the Image struct
+platform_image: PlatformImage,
+window: *Window,
+bbox: common.BBox,
+scaling: f32,
 allocator: std.mem.Allocator,
-window: *anywin.Window,
-images: std.ArrayListUnmanaged(*Image) = .{},
 
-pub fn init(allocator: std.mem.Allocator, window: *anywin.Window) @This() {
-    return .{ .window = window, .images = .{}, .allocator = allocator };
+pub fn init(allocator: std.mem.Allocator, window: *Window, bbox: common.BBox) !@This() {
+    ...
 }
 
 pub fn deinit(self: *@This()) void { ... }
@@ -48,7 +50,7 @@ pub fn deinit(self: *@This()) void { ... }
 
 Callers get the type name from the import:
 ```zig
-const Canvas = @import("canvas.zig");
+const Image = @import("image.zig");
 ```
 
 When a file exports multiple types (e.g. `common.zig`), use named `pub const`
@@ -129,11 +131,11 @@ Imports go at the **bottom** of the file (Zig convention for file-as-struct
 modules — fields must come first).
 
 ```zig
-// At the bottom of canvas.zig
+// At the bottom of image.zig
 const std = @import("std");
-const anywin = @import("anywindow");
-const Image = @import("image.zig");
-const Context = @import("context.zig");
+const common = @import("common.zig");
+const Window = @import("any.zig").Window;
+const PlatformImage = @import("any.zig").PlatformImage;
 ```
 
 ## Return values
@@ -153,11 +155,14 @@ pub fn init(allocator: std.mem.Allocator) @This() {
 - Use `catch |err| switch (err) { ... }` for selective error handling.
 
 ```zig
-pub fn createImage(self: *@This(), bbox: BBox) !*Image {
-    const img = try self.allocator.create(Image);
-    errdefer self.allocator.destroy(img);
-    img.* = try Image.init(self.allocator, bbox);
-    return img;
+pub fn init(allocator: std.mem.Allocator, window: *Window, bbox: common.BBox) !@This() {
+    const platform_image = try window.createImage(.{ .width = scale(bbox.width, window.scaling) });
+    return .{
+        .platform_image = platform_image,
+        .window = window,
+        .bbox = bbox,
+        .allocator = allocator,
+    };
 }
 ```
 
@@ -168,8 +173,8 @@ pub fn createImage(self: *@This(), bbox: BBox) !*Image {
 - Use `defer`/`errdefer` at the call site.
 
 ```zig
-var canvas: Canvas = .init(allocator, &window);
-defer canvas.deinit();
+var img = try anywin.Image.init(allocator, &window, .{ .width = 200, .height = 100, .x = 10, .y = 10 });
+defer img.deinit();
 ```
 
 ## Tagged unions and enums
@@ -221,10 +226,10 @@ inline for (source_fields, 0..) |field, i| {
 - `//` for inline explanations. Only where the code isn't self-evident.
 
 ```zig
-//! 2D drawing context inspired by the HTML5 Canvas API.
+//! A positioned image with DPI scaling.
 
-/// Create a new Canvas bound to a window.
-pub fn init(allocator: std.mem.Allocator, window: *anywin.Window) @This() { ... }
+/// Initialize an image bound to a window at the given position and size.
+pub fn init(allocator: std.mem.Allocator, window: *Window, bbox: common.BBox) !@This() { ... }
 
 // P4: packed binary bits, MSB first, rows padded to byte boundary
 ```
