@@ -197,7 +197,15 @@ pub const WindowManager = struct {
                         },
                     };
                 },
-                // TODO: resize, get size and dpy?
+                .ConfigureNotify => |configure| {
+                    return .{
+                        .resize = .{
+                            .width = configure.width,
+                            .height = configure.height,
+                            .window_id = configure.window_id,
+                        },
+                    };
+                },
                 else => {
                     return .{ .nop = {} };
                 },
@@ -452,7 +460,6 @@ pub const Image = struct {
     size: common.Size,
 
     pub fn init(window: *Window, size: common.Size) !@This() {
-        std.debug.assert(size.width * size.height * 4 <= std.math.maxInt(u16));
         const pixmap_id = try window.wm.xid.genID();
 
         const pixmap_req = x11.proto.CreatePixmap{
@@ -474,26 +481,39 @@ pub const Image = struct {
 
     pub fn setPixels(self: @This(), pixels: []const u8) !void {
         const image_info = x11.getImageInfo(self.window.wm.info, self.window.root);
+        const row_bytes: usize = @as(usize, self.size.width) * 4;
+        const max_rows: u16 = if (row_bytes == 0) self.size.height else @intCast(@min(self.size.height, 65535 / row_bytes));
+        if (max_rows == 0) return;
 
-        var reader = std.Io.Reader.fixed(pixels);
-        var pixmap_reader = x11.RgbaToZPixmapReader.init(image_info, &reader);
+        var y: u16 = 0;
+        while (y < self.size.height) {
+            const strip_height: u16 = @intCast(@min(max_rows, self.size.height - y));
+            const strip_offset = @as(usize, y) * row_bytes;
+            const strip_len = @as(usize, strip_height) * row_bytes;
+            const strip_pixels = pixels[strip_offset..][0..strip_len];
 
-        const put_image_req = x11.proto.PutImage{
-            .drawable_id = self.image_id,
-            .graphic_context_id = self.window.graphic_context_id,
-            .width = self.size.width,
-            .height = self.size.height,
-            .x = 0,
-            .y = 0,
-            .depth = self.window.depth,
-        };
+            var reader = std.Io.Reader.fixed(strip_pixels);
+            var pixmap_reader = x11.RgbaToZPixmapReader.init(image_info, &reader);
 
-        try x11.stream(
-            &self.window.wm.net_writer.interface,
-            put_image_req,
-            (&pixmap_reader).interface(),
-            self.size.height * self.size.width * 4,
-        );
+            const put_image_req = x11.proto.PutImage{
+                .drawable_id = self.image_id,
+                .graphic_context_id = self.window.graphic_context_id,
+                .width = self.size.width,
+                .height = strip_height,
+                .x = 0,
+                .y = @intCast(y),
+                .depth = self.window.depth,
+            };
+
+            try x11.stream(
+                &self.window.wm.net_writer.interface,
+                put_image_req,
+                (&pixmap_reader).interface(),
+                strip_len,
+            );
+
+            y += strip_height;
+        }
     }
 
     pub fn draw(self: @This(), target: common.BBox) !void {

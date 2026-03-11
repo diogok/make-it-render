@@ -89,6 +89,11 @@ pub fn EventLoop(Sources: type) type {
             return self.queue.receive();
         }
 
+        /// Non-blocking pull. Returns null if no event is queued.
+        pub fn pull(self: *Self) ?Event {
+            return self.queue.pull();
+        }
+
         /// Signal all sources to stop (if they support it).
         pub fn stop(self: *Self) void {
             inline for (source_fields) |field| {

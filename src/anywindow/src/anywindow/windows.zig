@@ -512,7 +512,17 @@ pub fn windowProc(
             events.push(.{ .nop = {} });
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
         },
-        // TODO: Resize
+        .WM_SIZE => {
+            const width = win.loword(lparam);
+            const height = win.hiword(lparam);
+            events.push(.{
+                .resize = .{
+                    .width = width,
+                    .height = height,
+                    .window_id = window_id,
+                },
+            });
+        },
         else => {
             events.push(.{ .nop = {} });
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);

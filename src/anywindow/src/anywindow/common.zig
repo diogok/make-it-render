@@ -85,6 +85,11 @@ pub const Event = union(enum) {
         modifiers: Modifiers,
         window_id: WindowID,
     },
+    resize: struct {
+        width: Width,
+        height: Height,
+        window_id: WindowID,
+    },
 };
 
 const keys = @import("keys.zig");
