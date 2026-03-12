@@ -87,6 +87,7 @@ pub const Window = struct {
             .background = background,
         };
 
+        // TODO: check for support in single_threaded build
         const thread = std.Thread.spawn(.{}, WindowThread.run, .{&ctx}) catch return error.ThreadSpawnError;
         try ctx.wait();
 
@@ -350,67 +351,67 @@ const WindowThread = struct {
     ready: bool = false,
 
     /// create window, check DPI and start loop to receive messages
-fn run(self: *@This()) void {
-    self.mutex.lock();
+    fn run(self: *@This()) void {
+        self.mutex.lock();
 
-    self.thread_id = win.GetCurrentThreadId();
+        self.thread_id = win.GetCurrentThreadId();
 
-    const handle = win.CreateWindowExW(
-        win.ExtendedWindowStyle.OverlappedWindow,
-        self.class_name,
-        self.title,
-        win.WindowStyle.OverlappedWindow,
-        self.options.x orelse win.UseDefault,
-        self.options.y orelse win.UseDefault,
-        self.options.width orelse win.UseDefault,
-        self.options.height orelse win.UseDefault,
-        null,
-        null,
-        self.wm.instance,
-        null,
-    );
-    if (handle == null) {
-        self.init_err = true;
+        const handle = win.CreateWindowExW(
+            win.ExtendedWindowStyle.OverlappedWindow,
+            self.class_name,
+            self.title,
+            win.WindowStyle.OverlappedWindow,
+            self.options.x orelse win.UseDefault,
+            self.options.y orelse win.UseDefault,
+            self.options.width orelse win.UseDefault,
+            self.options.height orelse win.UseDefault,
+            null,
+            null,
+            self.wm.instance,
+            null,
+        );
+        if (handle == null) {
+            self.init_err = true;
+            self.ready = true;
+            self.cond.signal();
+            self.mutex.unlock();
+            return;
+        }
+        self.handle = handle;
+
+        const frame = win.CreateCompatibleDC(null);
+        if (frame == null) {
+            self.init_err = true;
+            self.ready = true;
+            self.cond.signal();
+            self.mutex.unlock();
+            return;
+        }
+        self.frame = frame;
+
+        const dpi = win.GetDpiForWindow(handle);
+        self.scaling = @as(f32, @floatFromInt(dpi)) / 96.0;
+
         self.ready = true;
         self.cond.signal();
         self.mutex.unlock();
-        return;
-    }
-    self.handle = handle;
 
-    const frame = win.CreateCompatibleDC(null);
-    if (frame == null) {
-        self.init_err = true;
-        self.ready = true;
-        self.cond.signal();
+        // Message pump — blocks until WM_QUIT
+        var msg: win.Message = undefined;
+        while (win.GetMessageW(&msg, null, 0, 0) > 0) {
+            _ = win.TranslateMessage(&msg);
+            _ = win.DispatchMessageW(&msg);
+        }
+    }
+
+    /// Wait for thread to finish window creation
+    fn wait(self: *@This()) !void {
+        self.mutex.lock();
+        while (!self.ready) self.cond.wait(&self.mutex);
         self.mutex.unlock();
-        return;
+
+        if (self.init_err) return error.CreateWindowError;
     }
-    self.frame = frame;
-
-    const dpi = win.GetDpiForWindow(handle);
-    self.scaling = @as(f32, @floatFromInt(dpi)) / 96.0;
-
-    self.ready = true;
-    self.cond.signal();
-    self.mutex.unlock();
-
-    // Message pump — blocks until WM_QUIT
-    var msg: win.Message = undefined;
-    while (win.GetMessageW(&msg, null, 0, 0) > 0) {
-        _ = win.TranslateMessage(&msg);
-        _ = win.DispatchMessageW(&msg);
-    }
-}
-
-/// Wait for thread to finish window creation
-fn wait(self: *@This()) !void {
-    self.mutex.lock();
-    while (!self.ready) self.cond.wait(&self.mutex);
-    self.mutex.unlock();
-
-    if (self.init_err) return error.CreateWindowError;
-}
 };
 
 pub fn windowProc(

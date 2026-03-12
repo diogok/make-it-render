@@ -107,7 +107,12 @@ pub extern "user32" fn PostQuitMessage(
     val: i32,
 ) callconv(.winapi) void;
 
-pub extern "user32" fn PostThreadMessageW(idThread: u32, Msg: u32, wParam: usize, lParam: isize,) callconv(.winapi) bool;
+pub extern "user32" fn PostThreadMessageW(
+    idThread: u32,
+    Msg: u32,
+    wParam: usize,
+    lParam: isize,
+) callconv(.winapi) bool;
 pub extern "kernel32" fn GetCurrentThreadId() callconv(.winapi) u32;
 
 /// WindowProcedure is the function signature to handle window messages.
