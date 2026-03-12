@@ -107,6 +107,9 @@ pub extern "user32" fn PostQuitMessage(
     val: i32,
 ) callconv(.winapi) void;
 
+pub extern "user32" fn PostThreadMessageW(idThread: u32, Msg: u32, wParam: usize, lParam: isize,) callconv(.winapi) bool;
+pub extern "kernel32" fn GetCurrentThreadId() callconv(.winapi) u32;
+
 /// WindowProcedure is the function signature to handle window messages.
 pub const WindowProcedure = switch (@import("builtin").zig_backend) {
     .stage1 => fn (
@@ -217,6 +220,7 @@ pub const MessageType = enum(u32) {
     WM_DESTROY = 0x0002,
     WM_SIZE = 0x0005,
     WM_CLOSE = 0x0010,
+    WM_QUIT = 0x0012,
     WM_PAINT = 0x000F, //15,
     WM_KEYDOWN = 0x0100,
     WM_KEYUP = 0x0101,

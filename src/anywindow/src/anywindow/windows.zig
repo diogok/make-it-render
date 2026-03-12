@@ -19,7 +19,7 @@ pub const WindowManager = struct {
     }
 
     pub fn deinit(_: *@This()) void {
-        win.PostQuitMessage(0);
+        events.close();
     }
 
     pub fn createWindow(self: *@This(), options: common.WindowOptions) !Window {
@@ -27,19 +27,7 @@ pub const WindowManager = struct {
     }
 
     pub fn receive(_: *@This()) !common.Event {
-        if (events.pull()) |event| {
-            return event;
-        }
-        var msg: win.Message = undefined;
-        if (win.GetMessageW(&msg, null, 0, 0) > 0) {
-            _ = win.TranslateMessage(&msg);
-            _ = win.DispatchMessageW(&msg);
-        }
-        if (events.pull()) |event| {
-            return event;
-        } else {
-            return .{ .nop = {} };
-        }
+        return events.receive() orelse .{ .nop = {} };
     }
 
     pub fn flush(_: *@This()) !void {
@@ -56,6 +44,8 @@ pub const Window = struct {
     title: [:0]u16,
 
     status: common.WindowStatus,
+    thread: ?std.Thread = null,
+    thread_id: u32 = 0,
 
     display: ?win.DeviceContext = null,
     background: ?win.BrushHandler = null,
@@ -68,9 +58,9 @@ pub const Window = struct {
     saved_rect: win.Rect = .{},
 
     pub fn init(wm: *WindowManager, options: common.WindowOptions) !@This() {
-        const class_name_n = try std.fmt.allocPrint(wm.allocator, "WindowClass_{d}", .{class_count});
+        const count = class_count.fetchAdd(1, .monotonic);
+        const class_name_n = try std.fmt.allocPrint(wm.allocator, "WindowClass_{d}", .{count});
         defer wm.allocator.free(class_name_n);
-        defer class_count += 1;
 
         const class_name = try win.W(wm.allocator, class_name_n);
         const cursor = win.LoadCursorW(null, .Arrow);
@@ -87,49 +77,38 @@ pub const Window = struct {
 
         _ = win.RegisterClassExW(&window_class);
 
-        const frame_handle = win.CreateCompatibleDC(null);
-        if (frame_handle == null) {
-            const err = win.GetLastError();
-            log.err("CreateCompatibleDC error: {any}", .{err});
-            return error.NoCompatibleDC;
-        }
         const title = try win.W(wm.allocator, options.title);
 
-        const handle = win.CreateWindowExW(
-            win.ExtendedWindowStyle.OverlappedWindow,
-            class_name,
-            title,
-            win.WindowStyle.OverlappedWindow,
-            options.x orelse win.UseDefault,
-            options.y orelse win.UseDefault,
-            options.width orelse win.UseDefault,
-            options.height orelse win.UseDefault,
-            null,
-            null,
-            wm.instance,
-            null,
-        );
-        if (handle == null) {
-            return error.CreateWindowError;
-        }
+        var ctx = WindowThread{
+            .wm = wm,
+            .options = options,
+            .class_name = class_name,
+            .title = title,
+            .background = background,
+        };
 
-        const dpi = win.GetDpiForWindow(handle);
-        const scaling: f32 = @as(f32, @floatFromInt(dpi)) / 96.0;
+        const thread = std.Thread.spawn(.{}, WindowThread.run, .{&ctx}) catch return error.ThreadSpawnError;
+        try ctx.wait();
 
         return .{
             .wm = wm,
-            .handle = handle,
-            .frame = frame_handle,
+            .handle = ctx.handle,
+            .frame = ctx.frame,
             .status = .open,
             .title = title,
             .class_name = class_name,
             .background = background,
-            .scaling = scaling,
+            .scaling = ctx.scaling,
+            .thread = thread,
+            .thread_id = ctx.thread_id,
         };
     }
 
     pub fn deinit(self: *@This()) void {
-        // TODO: call DeleteDC(self.frame) once binding is added to free the compatible DC
+        if (self.thread_id != 0) {
+            _ = win.PostThreadMessageW(self.thread_id, @intFromEnum(win.MessageType.WM_QUIT), 0, 0);
+        }
+        if (self.thread) |t| t.join();
         self.wm.allocator.free(self.title);
         self.wm.allocator.free(self.class_name);
     }
@@ -346,12 +325,93 @@ pub const Image = struct {
     }
 };
 
-var class_count: usize = 0;
+var class_count = std.atomic.Value(usize).init(0);
+var events: queue.ThreadSafeQueue(common.Event) = .{};
 
-/// Event queue. Thread-safe in practice because windowProc and receive()
-/// run on the same thread (synchronous Windows message loop). If this
-/// assumption changes, switch to ThreadSafeQueue.
-var events = queue.Queue(common.Event).init();
+/// Each window get it's own thread.
+/// WindowCreation and Message receiving must run on own thread.
+const WindowThread = struct {
+    wm: *WindowManager,
+    options: common.WindowOptions,
+    class_name: [:0]u16,
+    title: [:0]u16,
+    background: ?win.BrushHandler,
+
+    // Output — written by thread before signaling ready
+    handle: ?win.WindowHandle = null,
+    frame: ?win.DeviceContext = null,
+    scaling: f32 = 1.0,
+    thread_id: u32 = 0,
+    init_err: bool = false,
+
+    // Sync
+    mutex: std.Thread.Mutex = .{},
+    cond: std.Thread.Condition = .{},
+    ready: bool = false,
+
+    /// create window, check DPI and start loop to receive messages
+fn run(self: *@This()) void {
+    self.mutex.lock();
+
+    self.thread_id = win.GetCurrentThreadId();
+
+    const handle = win.CreateWindowExW(
+        win.ExtendedWindowStyle.OverlappedWindow,
+        self.class_name,
+        self.title,
+        win.WindowStyle.OverlappedWindow,
+        self.options.x orelse win.UseDefault,
+        self.options.y orelse win.UseDefault,
+        self.options.width orelse win.UseDefault,
+        self.options.height orelse win.UseDefault,
+        null,
+        null,
+        self.wm.instance,
+        null,
+    );
+    if (handle == null) {
+        self.init_err = true;
+        self.ready = true;
+        self.cond.signal();
+        self.mutex.unlock();
+        return;
+    }
+    self.handle = handle;
+
+    const frame = win.CreateCompatibleDC(null);
+    if (frame == null) {
+        self.init_err = true;
+        self.ready = true;
+        self.cond.signal();
+        self.mutex.unlock();
+        return;
+    }
+    self.frame = frame;
+
+    const dpi = win.GetDpiForWindow(handle);
+    self.scaling = @as(f32, @floatFromInt(dpi)) / 96.0;
+
+    self.ready = true;
+    self.cond.signal();
+    self.mutex.unlock();
+
+    // Message pump — blocks until WM_QUIT
+    var msg: win.Message = undefined;
+    while (win.GetMessageW(&msg, null, 0, 0) > 0) {
+        _ = win.TranslateMessage(&msg);
+        _ = win.DispatchMessageW(&msg);
+    }
+}
+
+/// Wait for thread to finish window creation
+fn wait(self: *@This()) !void {
+    self.mutex.lock();
+    while (!self.ready) self.cond.wait(&self.mutex);
+    self.mutex.unlock();
+
+    if (self.init_err) return error.CreateWindowError;
+}
+};
 
 pub fn windowProc(
     window_handle: win.WindowHandle,
@@ -364,9 +424,7 @@ pub fn windowProc(
         .WM_CLOSE => {
             events.push(.{ .close = window_id });
         },
-        .WM_ERASEBKGND => {
-            events.push(.{ .nop = {} });
-        },
+        .WM_ERASEBKGND => {},
         .WM_PAINT => {
             var rect: win.Rect = std.mem.zeroes(win.Rect);
             _ = win.GetUpdateRect(window_handle, &rect, false);
@@ -511,11 +569,9 @@ pub fn windowProc(
             });
         },
         .WM_CREATE => {
-            events.push(.{ .nop = {} });
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
         },
         .WM_DPICHANGED => {
-            events.push(.{ .nop = {} });
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
         },
         .WM_SIZE => {
@@ -530,7 +586,6 @@ pub fn windowProc(
             });
         },
         else => {
-            events.push(.{ .nop = {} });
             return win.DefWindowProcW(window_handle, message_type, wparam, lparam);
         },
     }
