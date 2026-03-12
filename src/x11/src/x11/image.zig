@@ -88,6 +88,7 @@ pub fn rgbaToZPixmapInPlace(info: ImageInfo, pixels: []u8) !void {
 }
 
 fn rgbaToZPixmap(pixels: []u8) void {
+    std.debug.assert(pixels.len % 4 == 0);
     var idx: usize = 0;
     while (idx < pixels.len) : (idx += 4) {
         const b = pixels[idx + 2];

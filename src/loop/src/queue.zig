@@ -1,4 +1,5 @@
 const std = @import("std");
+const log = std.log.scoped(.queue);
 
 /// Thread-safe fixed-size queue.
 /// Uses Mutex + Condition for blocking receive.
@@ -17,6 +18,9 @@ pub fn ThreadSafeQueue(Type: type) type {
             self.mutex.lock();
             defer self.mutex.unlock();
 
+            if (self.tail +% 1 == self.head) {
+                log.warn("Event queue full, dropping oldest event", .{});
+            }
             self.data[self.tail] = item;
             self.tail = self.tail +% 1;
 

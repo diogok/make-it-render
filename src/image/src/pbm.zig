@@ -20,6 +20,7 @@ pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Bitma
     const height = try std.fmt.parseInt(u16, tokenizer.next() orelse return error.InvalidFormat, 10);
 
     if (width == 0 or height == 0) return error.InvalidFormat;
+    if (width > 16384 or height > 16384) return error.InvalidFormat;
 
     const bitmap_size = @as(usize, width) * @as(usize, height);
     const bitmap = try allocator.alloc(u1, bitmap_size);

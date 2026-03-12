@@ -51,7 +51,9 @@ fn sendSetupRequest(writer: *std.Io.Writer, auth_name: []const u8, auth_data: []
 fn readSetupReply(allocator: std.mem.Allocator, reader: *std.Io.Reader) !Setup {
     const status_reply = try reader.takeStruct(proto.SetupStatus, endian);
 
-    const reply = try allocator.alloc(u8, status_reply.reply_len * 4);
+    const reply_size = @as(usize, status_reply.reply_len) * 4;
+    if (reply_size > 1024 * 1024) return error.SetupDataTooLarge;
+    const reply = try allocator.alloc(u8, reply_size);
     defer allocator.free(reply);
     try reader.readSliceAll(reply); // read rest of response
 
@@ -68,11 +70,13 @@ fn readSetupReply(allocator: std.mem.Allocator, reader: *std.Io.Reader) !Setup {
     const base_reply = try reply_reader.readStruct(proto.SetupContent);
     log.debug("Base setup: {any}", .{base_reply});
 
+    if (base_reply.vendor_len > 1024) return error.SetupDataTooLarge;
     const vendor = try allocator.alloc(u8, base_reply.vendor_len);
     defer allocator.free(vendor);
     _ = try reply_reader.read(vendor);
     _ = try reply_reader.skipBytes(vendor.len % 4, .{}); // pad vendor
 
+    if (base_reply.pixmap_formats_len > 256) return error.SetupDataTooLarge;
     const formats = try allocator.alloc(proto.Format, base_reply.pixmap_formats_len);
     errdefer allocator.free(formats);
     for (formats, 0..) |_, format_index| {
@@ -80,6 +84,7 @@ fn readSetupReply(allocator: std.mem.Allocator, reader: *std.Io.Reader) !Setup {
         log.debug("Format: {any}", .{formats[format_index]});
     }
 
+    if (base_reply.roots_len > 64) return error.SetupDataTooLarge;
     const screens = try allocator.alloc(Screen, base_reply.roots_len);
     var screens_initialized: usize = 0;
     errdefer {
@@ -94,6 +99,7 @@ fn readSetupReply(allocator: std.mem.Allocator, reader: *std.Io.Reader) !Setup {
         screens[screen_index] = Screen.initFromProto(screen);
         log.debug("Screen: {any}", .{screens[screen_index]});
 
+        if (screen.allowed_depths_len > 128) return error.SetupDataTooLarge;
         const allowed_depths = try allocator.alloc(Depth, screen.allowed_depths_len);
         var depths_initialized: usize = 0;
         errdefer {
@@ -108,6 +114,7 @@ fn readSetupReply(allocator: std.mem.Allocator, reader: *std.Io.Reader) !Setup {
             allowed_depths[depth_index] = Depth.initFromProto(depth);
             log.debug("Allowed depths: {any}", .{allowed_depths[depth_index]});
 
+            if (depth.visual_type_len > 1024) return error.SetupDataTooLarge;
             const visual_types = try allocator.alloc(proto.VisualType, depth.visual_type_len);
             errdefer allocator.free(visual_types);
 

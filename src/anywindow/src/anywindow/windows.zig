@@ -129,6 +129,7 @@ pub const Window = struct {
     }
 
     pub fn deinit(self: *@This()) void {
+        // TODO: call DeleteDC(self.frame) once binding is added to free the compatible DC
         self.wm.allocator.free(self.title);
         self.wm.allocator.free(self.class_name);
     }
@@ -200,7 +201,7 @@ pub const Window = struct {
         defer _ = win.DeleteObject(color_bmp);
 
         // Copy RGBA -> BGRA
-        const pixel_count = icon.width * icon.height;
+        const pixel_count = std.math.mul(usize, @as(usize, icon.width), @as(usize, icon.height)) catch return error.IconTooLarge;
         for (0..pixel_count) |i| {
             const off = i * 4;
             color_pixels[off + 0] = icon.pixels[off + 2]; // B
@@ -306,6 +307,8 @@ pub const Image = struct {
     }
 
     pub fn setPixels(self: @This(), pixels: []const u8) !void {
+        const expected = @as(usize, self.size.width) * @as(usize, self.size.height) * 4;
+        if (pixels.len < expected) return error.InsufficientPixelData;
         var i: usize = 0;
         while (i + 3 < pixels.len) : (i += 4) {
             // RGB to BGR
@@ -345,6 +348,9 @@ pub const Image = struct {
 
 var class_count: usize = 0;
 
+/// Event queue. Thread-safe in practice because windowProc and receive()
+/// run on the same thread (synchronous Windows message loop). If this
+/// assumption changes, switch to ThreadSafeQueue.
 var events = queue.Queue(common.Event).init();
 
 pub fn windowProc(

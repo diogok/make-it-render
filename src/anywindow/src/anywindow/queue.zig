@@ -1,3 +1,6 @@
+const std = @import("std");
+const log = std.log.scoped(.queue);
+
 /// Simple single threaded and fixed size queue.
 pub fn Queue(Type: type) type {
     return struct {
@@ -10,6 +13,9 @@ pub fn Queue(Type: type) type {
         }
 
         pub fn push(self: *@This(), item: Type) void {
+            if (self.tail +% 1 == self.head) {
+                log.warn("Event queue full, dropping oldest event", .{});
+            }
             self.data[self.tail] = item;
             self.tail = self.tail +% 1;
         }

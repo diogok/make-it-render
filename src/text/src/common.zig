@@ -62,7 +62,7 @@ pub const Bitmap = struct {
 };
 
 pub fn bitmapToRgba(allocator: std.mem.Allocator, bitmap: []const u1, pixel: []const u8) ![]u8 {
-    std.debug.assert(pixel.len == 4);
+    if (pixel.len != 4) return error.InvalidPixelSize;
     const buffer = try allocator.alloc(u8, bitmap.len * 4);
     for (bitmap, 0..) |b, i| {
         if (b == 1) {

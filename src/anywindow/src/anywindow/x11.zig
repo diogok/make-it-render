@@ -301,7 +301,7 @@ pub const Window = struct {
             .window_id = window_id,
             .property = wm.atoms.wm_name,
             .property_type = wm.atoms.string,
-            .length_of_data = @truncate(options.title.len),
+            .length_of_data = @intCast(options.title.len),
         };
         try x11.sendWithBytes(wm.conn, set_name_req, options.title);
 
@@ -400,7 +400,7 @@ pub const Window = struct {
             .property = self.wm.atoms.net_wm_icon,
             .property_type = self.wm.atoms.cardinal,
             .format = 32,
-            .length_of_data = @truncate(data_len),
+            .length_of_data = @intCast(data_len),
         };
         try x11.sendWithBytes(self.wm.conn, set_icon_req, std.mem.sliceAsBytes(data));
     }
@@ -551,6 +551,7 @@ fn getDesktopScaling(allocator: std.mem.Allocator) !f32 {
     var scaling: f32 = 1.0;
 
     const conn = try x11.connect(.{});
+    defer conn.close();
 
     const info = try x11.setup(allocator, conn);
     defer info.deinit();
@@ -566,9 +567,13 @@ fn getDesktopScaling(allocator: std.mem.Allocator) !f32 {
     });
     const resource_reply = try x11.receiveReply(conn, x11.proto.GetPropertyReply);
 
-    var buffer: [256]u8 = undefined;
     if (resource_reply) |r| {
-        const tmp = buffer[0..r.value_len];
+        if (r.value_len > 4096) {
+            // Skip oversized response
+            return scaling / 96;
+        }
+        const tmp = try allocator.alloc(u8, r.value_len);
+        defer allocator.free(tmp);
         _ = try conn.read(tmp);
 
         var reader = std.Io.Reader.fixed(tmp);

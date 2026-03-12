@@ -3,8 +3,8 @@ pub const TextMetrics = struct {
     height: u16,
 };
 
-pub fn measure(fonts: []const common.Font, text: []const u8) TextMetrics {
-    var width: u16 = 0;
+pub fn measure(fonts: []const common.Font, text: []const u8) !TextMetrics {
+    var width: u32 = 0;
     var height: u16 = 0;
     var iter = std.unicode.Utf8Iterator{ .bytes = text, .i = 0 };
     while (iter.nextCodepoint()) |char| {
@@ -12,7 +12,8 @@ pub fn measure(fonts: []const common.Font, text: []const u8) TextMetrics {
         width += glyph.advance;
         height = @max(height, glyph.bbox.height);
     }
-    return .{ .width = width, .height = height };
+    if (width > std.math.maxInt(u16)) return error.TextTooLong;
+    return .{ .width = @intCast(width), .height = height };
 }
 
 pub fn render(
@@ -20,7 +21,7 @@ pub fn render(
     fonts: []const common.Font,
     text: []const u8,
 ) !common.Bitmap {
-    const metrics = measure(fonts, text);
+    const metrics = try measure(fonts, text);
     const width = metrics.width;
     const height = metrics.height;
     var iter = std.unicode.Utf8Iterator{ .bytes = text, .i = 0 };
@@ -39,7 +40,10 @@ pub fn render(
             while (col < glyph.bbox.width) : (col += 1) {
                 const g_index = (row * glyph.bbox.width) + col;
                 if (glyph.bitmap[g_index] == 1) {
-                    bitmap[(global_x + col) + (row * width)] = 1;
+                    const idx = @as(usize, global_x + col) + @as(usize, row) * @as(usize, width);
+                    if (idx < bitmap.len) {
+                        bitmap[idx] = 1;
+                    }
                 }
             }
         }
@@ -92,7 +96,7 @@ test "measure returns correct dimensions" {
     const uni = try @import("fonts/unifont/unifont.zig").unifont(testing.allocator);
     defer uni.deinit();
 
-    const metrics = measure(&[_]common.Font{uni}, "I, am!");
+    const metrics = try measure(&[_]common.Font{uni}, "I, am!");
     try testing.expectEqual(@as(u16, 48), metrics.width);
     try testing.expectEqual(@as(u16, 16), metrics.height);
 }
@@ -101,7 +105,7 @@ test "measure empty string returns zero" {
     const uni = try @import("fonts/unifont/unifont.zig").unifont(testing.allocator);
     defer uni.deinit();
 
-    const metrics = measure(&[_]common.Font{uni}, "");
+    const metrics = try measure(&[_]common.Font{uni}, "");
     try testing.expectEqual(@as(u16, 0), metrics.width);
     try testing.expectEqual(@as(u16, 0), metrics.height);
 }

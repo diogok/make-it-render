@@ -105,7 +105,7 @@ pub fn sendWithValues(conn: std.net.Stream, request: anytype, values: anytype) !
 /// This is naive because it expects that the next message is always the reply.
 /// Works fine before you create a window.
 pub fn internAtom(conn: std.net.Stream, name: []const u8) !u32 {
-    const request = proto.InternAtom{ .length_of_name = @truncate(name.len) };
+    const request = proto.InternAtom{ .length_of_name = @intCast(name.len) };
     try io.sendWithBytes(conn, request, name);
 
     const reply = try receiveReply(conn, proto.InternAtomReply);

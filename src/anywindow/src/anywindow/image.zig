@@ -95,8 +95,8 @@ fn nearestNeighbor(
     while (dst_y < dst_height) : (dst_y += 1) {
         var dst_x: usize = 0;
         while (dst_x < dst_width) : (dst_x += 1) {
-            const src_x = @as(usize, @intFromFloat(@as(f32, @floatFromInt(dst_x)) * x_ratio));
-            const src_y = @as(usize, @intFromFloat(@as(f32, @floatFromInt(dst_y)) * y_ratio));
+            const src_x = @min(@as(usize, @intFromFloat(@as(f32, @floatFromInt(dst_x)) * x_ratio)), @as(usize, src_width) -| 1);
+            const src_y = @min(@as(usize, @intFromFloat(@as(f32, @floatFromInt(dst_y)) * y_ratio)), @as(usize, src_height) -| 1);
 
             const src_idx = (src_y * src_width + src_x) * 4;
             const dst_idx = (dst_y * dst_width + dst_x) * 4;

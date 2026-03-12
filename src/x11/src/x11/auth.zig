@@ -30,36 +30,48 @@ fn read_xauth_file(allocator: std.mem.Allocator, xauth_file: std.fs.File) !XAuth
     var xauth_file_reader = xauth_file.reader(&buffer);
     const xauth_reader = &xauth_file_reader.interface;
 
-    // Skip unsupported fields
-    try xauth_reader.discardAll(2); // skip family
-    const address_len = try xauth_reader.takeInt(u16, .big); // size of address
-    try xauth_reader.discardAll(address_len); // skip address
-    const number_len = try xauth_reader.takeInt(u16, .big); // size of number
-    try xauth_reader.discardAll(number_len); // skip number
+    while (true) {
+        // Skip family (2 bytes)
+        xauth_reader.discardAll(2) catch return error.NoSupportedAuthFound;
+        // Skip address
+        const address_len = xauth_reader.takeInt(u16, .big) catch return error.NoSupportedAuthFound;
+        xauth_reader.discardAll(address_len) catch return error.NoSupportedAuthFound;
+        // Skip display number
+        const number_len = xauth_reader.takeInt(u16, .big) catch return error.NoSupportedAuthFound;
+        xauth_reader.discardAll(number_len) catch return error.NoSupportedAuthFound;
 
-    // Read auth name
-    const xauth_name_len = try xauth_reader.takeInt(u16, .big); // size of xauth name
-    const xauth_name = try allocator.alloc(u8, xauth_name_len);
-    errdefer allocator.free(xauth_name);
-    try xauth_reader.readSliceAll(xauth_name); // read name
+        const xauth_name_len = xauth_reader.takeInt(u16, .big) catch return error.NoSupportedAuthFound;
+        if (xauth_name_len > 256) return error.InvalidAuthFile;
+        const xauth_name = try allocator.alloc(u8, xauth_name_len);
+        xauth_reader.readSliceAll(xauth_name) catch {
+            allocator.free(xauth_name);
+            return error.NoSupportedAuthFound;
+        };
 
-    // Read auth data
-    const xauth_data_len = try xauth_reader.takeInt(u16, .big); // size of xauth data
-    const xauth_data = try allocator.alloc(u8, xauth_data_len);
-    errdefer allocator.free(xauth_data);
-    try xauth_reader.readSliceAll(xauth_data); // read data
+        const xauth_data_len = xauth_reader.takeInt(u16, .big) catch {
+            allocator.free(xauth_name);
+            return error.NoSupportedAuthFound;
+        };
+        if (xauth_data_len > 1024) {
+            allocator.free(xauth_name);
+            return error.InvalidAuthFile;
+        }
+        const xauth_data = try allocator.alloc(u8, xauth_data_len);
+        xauth_reader.readSliceAll(xauth_data) catch {
+            allocator.free(xauth_name);
+            allocator.free(xauth_data);
+            return error.NoSupportedAuthFound;
+        };
 
-    if (!std.mem.eql(u8, xauth_name, "MIT-MAGIC-COOKIE-1")) {
-        return error.UnsupportedAuth;
+        if (std.mem.eql(u8, xauth_name, "MIT-MAGIC-COOKIE-1")) {
+            log.debug("Auth name: {s}", .{xauth_name});
+            return .{ .name = xauth_name, .data = xauth_data, .allocator = allocator };
+        }
+
+        // Wrong method — free and try next entry
+        allocator.free(xauth_name);
+        allocator.free(xauth_data);
     }
-
-    log.debug("Auth name: {s}", .{xauth_name});
-
-    return .{
-        .name = xauth_name,
-        .data = xauth_data,
-        .allocator = allocator,
-    };
 }
 
 /// Authentication information
@@ -69,6 +81,9 @@ pub const XAuth = struct {
     allocator: std.mem.Allocator,
 
     pub fn deinit(self: @This()) void {
+        // Zero sensitive auth data before freeing
+        @memset(@constCast(self.data), 0);
+        @memset(@constCast(self.name), 0);
         self.allocator.free(self.name);
         self.allocator.free(self.data);
     }

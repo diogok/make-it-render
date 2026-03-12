@@ -24,37 +24,40 @@ pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Font 
     var bitmap_started: bool = false;
     var bitmap_pos: usize = 0;
 
-    var buf_alloc: std.heap.FixedBufferAllocator = undefined;
+    var buf_alloc: ?std.heap.FixedBufferAllocator = null;
 
     while (try reader.takeDelimiter('\n')) |line| {
         const trimmed = std.mem.trim(u8, line, " \t\r");
         var tokenizer = std.mem.tokenizeScalar(u8, trimmed, ' ');
 
-        const prop = tokenizer.next().?;
+        const prop = tokenizer.next() orelse continue;
 
         if (std.mem.eql(u8, prop, "FONTBOUNDINGBOX")) {
-            font.width = try std.fmt.parseInt(u16, tokenizer.next().?, 10);
-            font.height = try std.fmt.parseInt(u16, tokenizer.next().?, 10);
+            font.width = try std.fmt.parseInt(u16, tokenizer.next() orelse return error.InvalidFormat, 10);
+            font.height = try std.fmt.parseInt(u16, tokenizer.next() orelse return error.InvalidFormat, 10);
         } else if (std.mem.eql(u8, prop, "FONT_ASCENT")) {
-            font.ascent = try std.fmt.parseInt(u16, tokenizer.next().?, 10);
+            font.ascent = try std.fmt.parseInt(u16, tokenizer.next() orelse return error.InvalidFormat, 10);
         } else if (std.mem.eql(u8, prop, "CHARS")) {
-            font.count = try std.fmt.parseInt(u32, tokenizer.next().?, 10);
+            font.count = try std.fmt.parseInt(u32, tokenizer.next() orelse return error.InvalidFormat, 10);
 
             // pre-allocate all bitmaps
-            font.buffer = try allocator.alloc(u8, font.count * font.width * font.height);
+            const bytes_per_row = (@as(usize, font.width) + 7) / 8;
+            const per_glyph = std.math.mul(usize, @as(usize, font.height), bytes_per_row * 8) catch return error.InvalidFormat;
+            const total = std.math.mul(usize, @as(usize, font.count), per_glyph) catch return error.InvalidFormat;
+            font.buffer = try allocator.alloc(u8, total);
             buf_alloc = std.heap.FixedBufferAllocator.init(font.buffer);
 
             // ensure hashmap size
             try font.glyphs.ensureTotalCapacity(allocator, font.count);
         } else if (std.mem.eql(u8, prop, "ENCODING")) {
-            glyph.encoding = try std.fmt.parseInt(u21, tokenizer.next().?, 10);
+            glyph.encoding = try std.fmt.parseInt(u21, tokenizer.next() orelse return error.InvalidFormat, 10);
         } else if (std.mem.eql(u8, prop, "DWIDTH")) {
-            glyph.advance = try std.fmt.parseInt(u8, tokenizer.next().?, 10);
+            glyph.advance = try std.fmt.parseInt(u8, tokenizer.next() orelse return error.InvalidFormat, 10);
         } else if (std.mem.eql(u8, prop, "BBX")) {
-            glyph.bbox.width = try std.fmt.parseInt(u8, tokenizer.next().?, 10);
-            glyph.bbox.height = try std.fmt.parseInt(u8, tokenizer.next().?, 10);
-            glyph.bbox.x = try std.fmt.parseInt(i8, tokenizer.next().?, 10);
-            glyph.bbox.y = try std.fmt.parseInt(i8, tokenizer.next().?, 10);
+            glyph.bbox.width = try std.fmt.parseInt(u8, tokenizer.next() orelse return error.InvalidFormat, 10);
+            glyph.bbox.height = try std.fmt.parseInt(u8, tokenizer.next() orelse return error.InvalidFormat, 10);
+            glyph.bbox.x = try std.fmt.parseInt(i8, tokenizer.next() orelse return error.InvalidFormat, 10);
+            glyph.bbox.y = try std.fmt.parseInt(i8, tokenizer.next() orelse return error.InvalidFormat, 10);
 
             if (glyph.advance == 0) {
                 glyph.advance = glyph.bbox.width;
@@ -67,7 +70,11 @@ pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Font 
             const bytes_per_row = (glyph.bbox.width + 7) / 8;
             const bitmap_size = @as(usize, glyph.bbox.height) * bytes_per_row * 8;
             //bitmap = try allocator.alloc(u1, bitmap_size);
-            bitmap = try buf_alloc.allocator().alloc(u1, bitmap_size);
+            if (buf_alloc) |*ba| {
+                bitmap = try ba.allocator().alloc(u1, bitmap_size);
+            } else {
+                return error.InvalidFormat;
+            }
 
             bitmap_started = true;
             bitmap_pos = 0;
@@ -85,6 +92,7 @@ pub fn parse(allocator: std.mem.Allocator, reader: *std.Io.Reader) !common.Font 
                 if (end_bit > start_bit) {
                     for (start_bit..end_bit) |bit| {
                         if (bit < 32) {
+                            if (bitmap_pos >= bitmap.len) return error.InvalidFormat;
                             if ((aligned_value >> @intCast(31 - bit)) & 1 != 0) {
                                 bitmap[bitmap_pos] = 1;
                             } else {

@@ -1,5 +1,5 @@
 pub const unifont_gz = @embedFile("unifont-17.0.02.bdf.gz");
-pub const unifont_jp_gz = @embedFile("unifont-17.0.02.bdf.gz");
+pub const unifont_jp_gz = @embedFile("unifont_jp-17.0.02.bdf.gz");
 
 pub fn unifont(allocator: std.mem.Allocator) !common.Font {
     var buffer_reader = std.Io.Reader.fixed(unifont_gz);

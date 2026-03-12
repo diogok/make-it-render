@@ -37,19 +37,29 @@ fn get_socket_path(buffer: []u8) ![]const u8 {
     const display = std.posix.getenv("DISPLAY") orelse ":0";
     log.debug("Display: {s}", .{display});
 
-    const base_socket_path = "/tmp/.X11-unix/X";
-    const socket_path_len = base_socket_path.len + display.len - 1;
+    // Find colon separator
+    const colon_pos = std.mem.indexOfScalar(u8, display, ':') orelse return error.InvalidDisplay;
+    var display_num: []const u8 = display[colon_pos + 1 ..];
 
-    if (buffer.len < socket_path_len) {
-        return error.SocketPathBufferTooSmall;
+    // Strip optional screen number (e.g., ":0.0" → "0")
+    if (std.mem.indexOfScalar(u8, display_num, '.')) |dot| {
+        display_num = display_num[0..dot];
     }
 
-    var socket_path = buffer[0..socket_path_len];
+    // Validate: must be non-empty and digits only
+    if (display_num.len == 0) return error.InvalidDisplay;
+    for (display_num) |c| {
+        if (c < '0' or c > '9') return error.InvalidDisplay;
+    }
 
-    std.mem.copyForwards(u8, socket_path[0..base_socket_path.len], base_socket_path);
-    std.mem.copyForwards(u8, socket_path[base_socket_path.len..socket_path_len], display[1..]);
+    const base = "/tmp/.X11-unix/X";
+    const total = base.len + display_num.len;
+    if (buffer.len < total) return error.SocketPathBufferTooSmall;
 
-    return socket_path;
+    var path = buffer[0..total];
+    @memcpy(path[0..base.len], base);
+    @memcpy(path[base.len..], display_num);
+    return path;
 }
 
 /// Set read and write timeout on a socket.

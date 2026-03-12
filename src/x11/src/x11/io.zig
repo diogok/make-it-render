@@ -72,12 +72,10 @@ fn request_bytes_fixed_len(request: anytype, bytes_len: usize) [@sizeOf(@TypeOf(
 
 /// Return total length, including padding, that is need for whole data to be a multiple of 4.
 fn get_padded_len(request: anytype, src_bytes_len: usize) u16 {
-    const req_len: u16 = @sizeOf(@TypeOf(request)) / 4; // size of core request
-    const bytes_len: u16 = @intCast(src_bytes_len); // size of extra bytes
-    const pad_len: u16 = get_pad_len(bytes_len); // size of padding
-    const extra_len: u16 = (bytes_len + pad_len) / 4; // total extra len (bytes + padding)
-    const length: u16 = req_len + extra_len; // total request length
-    return length;
+    const req_len: usize = @sizeOf(@TypeOf(request)) / 4;
+    const pad_len: usize = get_pad_len(src_bytes_len);
+    const extra_len: usize = (src_bytes_len + pad_len) / 4;
+    return @intCast(req_len + extra_len);
 }
 
 test "Length calc" {
@@ -91,12 +89,12 @@ test "Length calc" {
 }
 
 /// Get how much padding is needed for the extra bytes to be multiple of 4.
-fn get_pad_len(bytes_len: usize) u16 {
+fn get_pad_len(bytes_len: usize) usize {
     const missing = bytes_len % 4;
     if (missing == 0) {
         return 0;
     }
-    return @as(u16, @intCast(4 - missing));
+    return 4 - missing;
 }
 
 test "padding length" {
