@@ -416,6 +416,21 @@ pub extern "user32" fn GetWindowRect(
     rect: ?*Rect,
 ) callconv(.winapi) i32;
 
+pub extern "user32" fn GetClientRect(
+    handle: ?WindowHandle,
+    rect: ?*Rect,
+) callconv(.winapi) i32;
+
+pub extern "gdi32" fn CreateCompatibleBitmap(
+    hdc: ?DeviceContext,
+    cx: i32,
+    cy: i32,
+) callconv(.winapi) ?Bitmap;
+
+pub extern "gdi32" fn DeleteDC(
+    hdc: ?DeviceContext,
+) callconv(.winapi) bool;
+
 pub extern "user32" fn GetDpiForWindow(
     hwnd: ?*anyopaque,
 ) callconv(.winapi) u32;

@@ -9,7 +9,9 @@ pub const WindowManager = struct {
     net_writer_buffer: []u8,
     net_writer: *std.net.Stream.Writer,
 
-    events: queue.Queue(common.Event),
+    events: queue.ThreadSafeQueue(common.Event),
+    reader_thread: ?std.Thread = null,
+    shutdown: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
 
     scaling: f32,
 
@@ -92,11 +94,14 @@ pub const WindowManager = struct {
             .min_keycode = min_kc,
             .max_keycode = max_kc,
 
-            .events = .init(),
+            .events = .{},
         };
     }
 
     pub fn deinit(self: *@This()) void {
+        self.shutdown.store(true, .release);
+        self.events.close();
+        if (self.reader_thread) |t| t.join();
         self.allocator.free(self.keysym_map);
         self.conn.close();
         self.info.deinit();
@@ -109,10 +114,21 @@ pub const WindowManager = struct {
     }
 
     pub fn receive(self: *@This()) !common.Event {
-        if (self.events.pull()) |event| {
-            return event;
+        if (self.reader_thread == null) {
+            self.reader_thread = std.Thread.spawn(.{}, readerRun, .{self}) catch return error.ThreadSpawnError;
         }
-        return try self.receive0();
+        return self.events.receive() orelse .{ .nop = {} };
+    }
+
+    fn readerRun(self: *@This()) void {
+        defer self.events.close();
+        while (!self.shutdown.load(.acquire)) {
+            const event = self.receive0() catch break;
+            switch (event) {
+                .nop => continue,
+                else => self.events.push(event),
+            }
+        }
     }
 
     fn receive0(self: *@This()) !common.Event {

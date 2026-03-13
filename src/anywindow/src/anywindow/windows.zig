@@ -48,6 +48,8 @@ pub const Window = struct {
     thread_id: u32 = 0,
 
     display: ?win.DeviceContext = null,
+    window_dc: ?win.DeviceContext = null,
+    backbuffer: ?win.Bitmap = null,
     background: ?win.BrushHandler = null,
 
     scaling: f32 = 1.0,
@@ -67,7 +69,7 @@ pub const Window = struct {
         const background = win.CreateSolidBrush(commonPixelToWinPixel(options.background));
 
         const window_class: win.WindowClass = .{
-            .style = @intFromEnum(win.ClassStyle.HREDRAW) | @intFromEnum(win.ClassStyle.VREDRAW),
+            .style = 0,
             .window_procedure = windowProc,
             .instance = wm.instance,
             .class_name = class_name,
@@ -211,12 +213,9 @@ pub const Window = struct {
     }
 
     pub fn clear(self: *@This(), _: common.BBox) !void {
-        //_ = win.InvalidateRect(self.handle, null, true);
         if (self.display) |_| {
             var rect = win.Rect{};
-            _ = win.GetWindowRect(self.handle, &rect);
-            rect.top = -1;
-            rect.left = -1;
+            _ = win.GetClientRect(self.handle, &rect);
             _ = win.FillRect(self.display, &rect, self.background);
         }
     }
@@ -236,15 +235,44 @@ pub const Window = struct {
     }
 
     pub fn beginDraw(self: *@This()) !void {
-        self.display = win.GetDC(self.handle);
+        const window_dc = win.GetDC(self.handle);
+        self.window_dc = window_dc;
+
+        var rect = win.Rect{};
+        _ = win.GetClientRect(self.handle, &rect);
+        const width = rect.right - rect.left;
+        const height = rect.bottom - rect.top;
+
+        if (width == 0 or height == 0) {
+            // Minimized — fall back to drawing directly
+            self.display = window_dc;
+            return;
+        }
+
+        const mem_dc = win.CreateCompatibleDC(window_dc);
+        const bitmap = win.CreateCompatibleBitmap(window_dc, width, height);
+        _ = win.SelectObject(mem_dc, bitmap);
+
+        self.display = mem_dc;
+        self.backbuffer = bitmap;
     }
 
     pub fn endDraw(self: *@This()) !void {
-        const released = win.ReleaseDC(self.handle, self.display);
-        if (released != 1) {
-            const err = win.GetLastError();
-            log.err("ReleaseDC error: {any}", .{err});
+        if (self.backbuffer) |bb| {
+            var rect = win.Rect{};
+            _ = win.GetClientRect(self.handle, &rect);
+            const width = rect.right - rect.left;
+            const height = rect.bottom - rect.top;
+
+            _ = win.BitBlt(self.window_dc, 0, 0, width, height, self.display, 0, 0, .SRCCOPY);
+            _ = win.DeleteDC(self.display);
+            _ = win.DeleteObject(bb);
         }
+
+        _ = win.ReleaseDC(self.handle, self.window_dc);
+        self.window_dc = null;
+        self.display = null;
+        self.backbuffer = null;
     }
 };
 
@@ -427,9 +455,6 @@ pub fn windowProc(
         },
         .WM_ERASEBKGND => {},
         .WM_PAINT => {
-            var rect: win.Rect = std.mem.zeroes(win.Rect);
-            _ = win.GetUpdateRect(window_handle, &rect, false);
-
             events.push(.{
                 .draw = .{
                     .window_id = window_id,
@@ -438,15 +463,8 @@ pub fn windowProc(
             });
 
             var paint = std.mem.zeroes(win.Paint);
-            const hdc = win.BeginPaint(window_handle, &paint);
-            const hMemDC = win.CreateCompatibleDC(hdc);
-
-            // TODO: paint in here
-
+            _ = win.BeginPaint(window_handle, &paint);
             _ = win.EndPaint(window_handle, &paint);
-            _ = win.DeleteObject(hMemDC);
-
-            _ = win.DwmFlush();
         },
         .WM_LBUTTONDOWN => {
             const x = win.loword(lparam);
