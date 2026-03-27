@@ -1,3 +1,6 @@
+
+# Replaced by [https://github.com/make-it-render](https://github.com/make-it-render)
+
 # Make it render
 
 A Zig library for cross-platform window handling and CPU-based rendering, without any dependencies.
